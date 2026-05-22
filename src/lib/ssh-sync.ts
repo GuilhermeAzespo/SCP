@@ -1,4 +1,4 @@
-import { execSync } from "child_process";
+import { execSync, spawnSync } from "child_process";
 import fs from "fs";
 
 /**
@@ -34,8 +34,7 @@ export function syncSshUser(
 
     if (plainPassword) {
       // Use spawnSync to pipe credentials directly to chpasswd, avoiding shell escaping issues
-      const { spawnSync } = require("child_process");
-      const result = spawnSync("chpasswd", [], {
+      const result = spawnSync("chpasswd", ["-c", "SHA512"], {
         input: `${slug}:${plainPassword}\n`,
         encoding: "utf8",
         timeout: 5000,
