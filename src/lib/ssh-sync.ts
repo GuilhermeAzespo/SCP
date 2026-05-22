@@ -50,6 +50,7 @@ export function syncSshUser(
         const generatedHash = shadowLine.split(":")[1];
         console.log(`[SSH Sync] Captured hash for DB persistence: ${slug}`);
         execSync(`chown -R ${slug}:${slug} ${homeDir}`);
+        execSync(`chmod 700 ${homeDir}`); // Restrict directory to owner only
         return generatedHash; // Return for storage in DB
       }
 
@@ -74,6 +75,7 @@ export function syncSshUser(
     }
 
     execSync(`chown -R ${slug}:${slug} ${homeDir}`);
+    execSync(`chmod 700 ${homeDir}`);
   } catch (error) {
     console.error(`[SSH Sync] Error syncing user ${slug}:`, error);
   }
