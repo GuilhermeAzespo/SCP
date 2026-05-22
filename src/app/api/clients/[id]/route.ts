@@ -3,6 +3,8 @@ import { db } from "@/lib/db";
 import { getSession } from "@/lib/auth-utils";
 import fs from "fs";
 import path from "path";
+import bcrypt from "bcryptjs";
+import { syncSshUser } from "@/lib/ssh-sync";
 
 export async function DELETE(
   request: Request,
@@ -52,3 +54,61 @@ export async function DELETE(
     );
   }
 }
+
+export async function PATCH(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const session = await getSession();
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { id } = await params;
+    const body = await request.json();
+    const { password } = body;
+
+    if (!password || password.length < 4) {
+      return NextResponse.json(
+        { error: "A senha deve ter pelo menos 4 caracteres" },
+        { status: 400 }
+      );
+    }
+
+    const client = await db.client.findUnique({
+      where: { id },
+    });
+
+    if (!client) {
+      return NextResponse.json({ error: "Cliente não encontrado" }, { status: 404 });
+    }
+
+    // Hash the new password for web portal
+    const passwordHash = await bcrypt.hash(password, 10);
+
+    await db.client.update({
+      where: { id },
+      data: { passwordHash },
+    });
+
+    // Synchronize to Linux SSH with new plainPassword
+    const generatedHash = syncSshUser(client.slug, password, null);
+    if (generatedHash) {
+      await db.client.update({
+        where: { id },
+        data: { sshPasswordHash: generatedHash },
+      });
+      console.log(`[SSH Sync] Updated SHA-512 hash in DB for client: ${client.slug}`);
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Reset password error:", error);
+    return NextResponse.json(
+      { error: "An unexpected error occurred" },
+      { status: 500 }
+    );
+  }
+}
+

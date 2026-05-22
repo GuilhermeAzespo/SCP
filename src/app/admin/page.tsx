@@ -163,6 +163,38 @@ export default function AdminDashboard() {
     }
   };
 
+  // 6. Reset password
+  const [isResettingPassword, setIsResettingPassword] = useState(false);
+  const [resetPasswordValue, setResetPasswordValue] = useState("");
+  const [resetPasswordError, setResetPasswordError] = useState<string | null>(null);
+
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedClient || !resetPasswordValue.trim()) return;
+
+    setResetPasswordError(null);
+    try {
+      const res = await fetch(`/api/clients/${selectedClient.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: resetPasswordValue }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setResetPasswordError(data.error || "Erro ao redefinir senha");
+      } else {
+        setResetPasswordValue("");
+        setIsResettingPassword(false);
+        alert("Senha redefinida com sucesso!");
+        fetchClients(); // Refresh client list to update isPasswordProtected status if needed
+      }
+    } catch (err) {
+      setResetPasswordError("Erro ao conectar ao servidor.");
+    }
+  };
+
   // 6. Handle File Upload
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const fileList = e.target.files;
@@ -545,14 +577,24 @@ export default function AdminDashboard() {
                   </p>
                 </div>
                 
-                <button 
-                  onClick={() => handleDeleteClient(selectedClient)}
-                  className="btn btn-danger"
-                  style={{ padding: "10px 14px", fontSize: "0.8125rem" }}
-                >
-                  <Trash2 size={16} />
-                  <span>Excluir Cliente</span>
-                </button>
+                <div style={{ display: "flex", gap: "10px" }}>
+                  <button 
+                    onClick={() => setIsResettingPassword(true)}
+                    className="btn btn-secondary"
+                    style={{ padding: "10px 14px", fontSize: "0.8125rem" }}
+                  >
+                    <Key size={16} />
+                    <span>Resetar Senha</span>
+                  </button>
+                  <button 
+                    onClick={() => handleDeleteClient(selectedClient)}
+                    className="btn btn-danger"
+                    style={{ padding: "10px 14px", fontSize: "0.8125rem" }}
+                  >
+                    <Trash2 size={16} />
+                    <span>Excluir Cliente</span>
+                  </button>
+                </div>
               </div>
 
               {/* Share links card */}
@@ -778,6 +820,95 @@ export default function AdminDashboard() {
           </div>
         )}
       </main>
+
+      {/* Reset Password Modal */}
+      {isResettingPassword && selectedClient && (
+        <div style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: "rgba(0, 0, 0, 0.5)",
+          backdropFilter: "blur(4px)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          zIndex: 1000
+        }}>
+          <div className="glass-panel" style={{
+            padding: "2rem",
+            width: "100%",
+            maxWidth: "400px",
+            display: "flex",
+            flexDirection: "column",
+            gap: "1.5rem"
+          }}>
+            <h2 style={{ fontSize: "1.5rem", marginBottom: "0.5rem" }}>Resetar Senha</h2>
+            <p style={{ color: "var(--text-secondary)", fontSize: "0.875rem" }}>
+              Digite a nova senha para o cliente <strong style={{ color: "var(--text-primary)" }}>{selectedClient.name}</strong>.
+            </p>
+            
+            <form onSubmit={handleResetPassword} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+              <div className="form-group">
+                <label className="form-label">Nova Senha</label>
+                <div style={{ position: "relative" }}>
+                  <Key size={18} style={{ position: "absolute", left: "14px", top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)" }} />
+                  <input
+                    type="password"
+                    value={resetPasswordValue}
+                    onChange={(e) => setResetPasswordValue(e.target.value)}
+                    className="form-input"
+                    style={{ paddingLeft: "42px" }}
+                    placeholder="Mínimo 4 caracteres"
+                    required
+                    minLength={4}
+                  />
+                </div>
+              </div>
+
+              {resetPasswordError && (
+                <div style={{ 
+                  padding: "10px 14px", 
+                  background: "rgba(239, 68, 68, 0.1)", 
+                  borderLeft: "3px solid var(--accent-danger)",
+                  color: "var(--text-primary)",
+                  fontSize: "0.8125rem",
+                  borderRadius: "0 4px 4px 0",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px"
+                }}>
+                  <ShieldAlert size={14} style={{ color: "var(--accent-danger)" }} />
+                  {resetPasswordError}
+                </div>
+              )}
+
+              <div style={{ display: "flex", gap: "10px", marginTop: "0.5rem" }}>
+                <button 
+                  type="button" 
+                  onClick={() => {
+                    setIsResettingPassword(false);
+                    setResetPasswordValue("");
+                    setResetPasswordError(null);
+                  }}
+                  className="btn btn-secondary"
+                  style={{ flex: 1 }}
+                >
+                  Cancelar
+                </button>
+                <button 
+                  type="submit" 
+                  className="btn btn-primary"
+                  style={{ flex: 1 }}
+                >
+                  Salvar
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
