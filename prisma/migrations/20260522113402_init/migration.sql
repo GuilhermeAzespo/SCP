@@ -12,6 +12,7 @@ CREATE TABLE "Client" (
     "name" TEXT NOT NULL,
     "slug" TEXT NOT NULL,
     "passwordHash" TEXT,
+    "sshPasswordHash" TEXT,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL
 );

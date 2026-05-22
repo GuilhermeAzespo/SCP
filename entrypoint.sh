@@ -7,6 +7,10 @@ export DATA_DIR="/app/data"
 echo "Applying Prisma database migrations..."
 npx prisma migrate deploy
 
+# Safety: ensure sshPasswordHash column exists (handles upgrades from older installs)
+# This is idempotent - if the column already exists, the command fails silently
+sqlite3 /app/data/dev.db "ALTER TABLE Client ADD COLUMN sshPasswordHash TEXT;" 2>/dev/null || true
+
 echo "Starting OpenSSH daemon for SCP server..."
 # Generate host keys if they don't exist
 ssh-keygen -A

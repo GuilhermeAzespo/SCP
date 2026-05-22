@@ -1,7 +1,7 @@
 FROM node:22-alpine
 
 # Install build tools for native C++ packages (required for better-sqlite3 compilation) and OpenSSH for SCP server
-RUN apk add --no-cache python3 make g++ gcc libc6-compat openssh shadow
+RUN apk add --no-cache python3 make g++ gcc libc6-compat openssh shadow sqlite
 
 WORKDIR /app
 

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getSession, hashPassword } from "@/lib/auth-utils";
+import { syncSshUser } from "@/lib/ssh-sync";
 
 // Slugify helper
 function slugify(text: string): string {
@@ -113,16 +114,14 @@ export async function POST(request: Request) {
 
     // Synchronize to Linux SSH: pass PLAINTEXT password so chpasswd can do SHA-512 natively
     // Then capture the generated hash and store it in DB for boot restores
-    import("@/lib/ssh-sync").then(async ({ syncSshUser }) => {
-      const generatedHash = syncSshUser(client.slug, password || null, null);
-      if (generatedHash) {
-        await db.client.update({
-          where: { id: client.id },
-          data: { sshPasswordHash: generatedHash },
-        });
-        console.log(`[SSH Sync] Stored SHA-512 hash in DB for client: ${client.slug}`);
-      }
-    });
+    const generatedHash = syncSshUser(client.slug, password || null, null);
+    if (generatedHash) {
+      await db.client.update({
+        where: { id: client.id },
+        data: { sshPasswordHash: generatedHash },
+      });
+      console.log(`[SSH Sync] Stored SHA-512 hash in DB for client: ${client.slug}`);
+    }
 
     return NextResponse.json({
       success: true,
