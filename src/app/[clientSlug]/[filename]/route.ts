@@ -51,7 +51,7 @@ export async function GET(
 
     // 4. Resolve physical path
     const dataDir = process.env.DATA_DIR || "./data";
-    const physicalPath = path.join(process.cwd(), dataDir, file.path);
+    const physicalPath = path.resolve(process.cwd(), dataDir, file.path);
 
     if (!fs.existsSync(physicalPath)) {
       return new Response("File not found on server storage", { status: 404 });
