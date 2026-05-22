@@ -1,0 +1,37 @@
+datasource db {
+  provider = "sqlite"
+}
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma/client"
+}
+
+model User {
+  id           String   @id @default(uuid())
+  username     String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+}
+
+model Client {
+  id           String   @id @default(uuid())
+  name         String
+  slug         String   @unique
+  passwordHash String?  // Optional password to view the client shared files
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  files        File[]
+}
+
+model File {
+  id            String   @id @default(uuid())
+  name          String
+  path          String   // Storage location on the server
+  size          Int      // Size in bytes
+  mimeType      String   // Content-Type (e.g. application/pdf)
+  downloadCount Int      @default(0)
+  createdAt     DateTime @default(now())
+  clientId      String
+  client        Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+}

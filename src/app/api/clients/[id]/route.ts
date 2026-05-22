@@ -1,0 +1,49 @@
+import { NextResponse } from "next/server";
+import { db } from "@/lib/db";
+import { getSession } from "@/lib/auth-utils";
+import fs from "fs";
+import path from "path";
+
+export async function DELETE(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const session = await getSession();
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { id } = await params;
+
+    // Find the client to get their slug
+    const client = await db.client.findUnique({
+      where: { id },
+    });
+
+    if (!client) {
+      return NextResponse.json({ error: "Client not found" }, { status: 404 });
+    }
+
+    // Delete files from the filesystem
+    const uploadDir = process.env.DATA_DIR || "./data";
+    const clientUploadPath = path.join(process.cwd(), uploadDir, "uploads", client.slug);
+
+    if (fs.existsSync(clientUploadPath)) {
+      fs.rmSync(clientUploadPath, { recursive: true, force: true });
+    }
+
+    // Delete client from DB (cascade deletes file records due to Prisma schema schema)
+    await db.client.delete({
+      where: { id },
+    });
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Delete client error:", error);
+    return NextResponse.json(
+      { error: "An unexpected error occurred" },
+      { status: 500 }
+    );
+  }
+}
