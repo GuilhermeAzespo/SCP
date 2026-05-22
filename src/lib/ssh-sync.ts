@@ -49,8 +49,8 @@ export function syncSshUser(
       if (shadowLine) {
         const generatedHash = shadowLine.split(":")[1];
         console.log(`[SSH Sync] Captured hash for DB persistence: ${slug}`);
-        execSync(`chown -R ${slug}:${slug} ${homeDir}`);
-        execSync(`chmod 700 ${homeDir}`); // Restrict directory to owner only
+        execSync(`chown -R root:${slug} ${homeDir}`); // root owns it, user group can access
+        execSync(`chmod 750 ${homeDir}`); // 750 means group (user) gets r-x (read/execute) but no write
         return generatedHash; // Return for storage in DB
       }
 
@@ -74,8 +74,8 @@ export function syncSshUser(
       console.log(`[SSH Sync] No password for ${slug}, account locked.`);
     }
 
-    execSync(`chown -R ${slug}:${slug} ${homeDir}`);
-    execSync(`chmod 700 ${homeDir}`);
+    execSync(`chown -R root:${slug} ${homeDir}`);
+    execSync(`chmod 750 ${homeDir}`);
   } catch (error) {
     console.error(`[SSH Sync] Error syncing user ${slug}:`, error);
   }
