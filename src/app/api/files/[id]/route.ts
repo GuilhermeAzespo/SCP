@@ -27,7 +27,7 @@ export async function DELETE(
 
     // Physically delete file from disk
     const uploadDir = process.env.DATA_DIR || "./data";
-    const physicalPath = path.join(process.cwd(), uploadDir, file.path);
+    const physicalPath = path.resolve(process.cwd(), uploadDir, file.path);
 
     if (fs.existsSync(physicalPath)) {
       fs.unlinkSync(physicalPath);

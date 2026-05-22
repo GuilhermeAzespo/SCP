@@ -89,7 +89,7 @@ export async function POST(request: Request) {
 
     // 2. Prepare physical directories
     const dataDir = process.env.DATA_DIR || "./data";
-    const clientUploadDir = path.join(process.cwd(), dataDir, "uploads", client.slug);
+    const clientUploadDir = path.resolve(process.cwd(), dataDir, "uploads", client.slug);
     
     if (!fs.existsSync(clientUploadDir)) {
       fs.mkdirSync(clientUploadDir, { recursive: true });

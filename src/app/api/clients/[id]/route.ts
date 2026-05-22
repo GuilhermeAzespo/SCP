@@ -27,7 +27,7 @@ export async function DELETE(
 
     // Delete files from the filesystem
     const uploadDir = process.env.DATA_DIR || "./data";
-    const clientUploadPath = path.join(process.cwd(), uploadDir, "uploads", client.slug);
+    const clientUploadPath = path.resolve(process.cwd(), uploadDir, "uploads", client.slug);
 
     if (fs.existsSync(clientUploadPath)) {
       fs.rmSync(clientUploadPath, { recursive: true, force: true });
