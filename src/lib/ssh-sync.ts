@@ -33,14 +33,20 @@ export function syncSshUser(
     }
 
     if (plainPassword) {
-      // Write credentials to a temp file to safely handle special characters
-      const tmpFile = `/tmp/.chpasswd_${slug}`;
-      fs.writeFileSync(tmpFile, `${slug}:${plainPassword}`, { mode: 0o600 });
-      try {
-        execSync(`chpasswd < ${tmpFile}`);
+      // Use spawnSync to pipe credentials directly to chpasswd, avoiding shell escaping issues
+      const { spawnSync } = require("child_process");
+      const result = spawnSync("chpasswd", [], {
+        input: `${slug}:${plainPassword}\n`,
+        encoding: "utf8",
+        timeout: 5000,
+      });
+      
+      if (result.error) {
+        console.error(`[SSH Sync] chpasswd spawn error for ${slug}:`, result.error.message);
+      } else if (result.status !== 0) {
+        console.error(`[SSH Sync] chpasswd failed for ${slug} (exit ${result.status}):`, result.stderr);
+      } else {
         console.log(`[SSH Sync] Set password via chpasswd for: ${slug}`);
-      } finally {
-        fs.unlinkSync(tmpFile);
       }
 
       // Read back the generated SHA-512 hash from /etc/shadow for persistence

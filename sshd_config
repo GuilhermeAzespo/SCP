@@ -12,6 +12,9 @@ PasswordAuthentication yes
 # Disable empty passwords
 PermitEmptyPasswords no
 
+# Use shadow file directly instead of PAM (more reliable on Alpine)
+UsePAM no
+
 # Disable StrictModes to prevent Docker volume permission issues from blocking login
 StrictModes no
 
