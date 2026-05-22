@@ -12,8 +12,8 @@ echo "Starting OpenSSH daemon for SCP server..."
 ssh-keygen -A
 # Sync users from DB to Linux
 node boot-sync.js
-# Start sshd in the background
-/usr/sbin/sshd
+# Start sshd in the background but do not detach (-D) so we can see its logs in stderr (-e)
+/usr/sbin/sshd -D -e &
 
 echo "Starting Next.js application..."
 exec npm run start

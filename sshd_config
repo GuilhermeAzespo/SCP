@@ -15,6 +15,9 @@ PermitEmptyPasswords no
 # Disable StrictModes to prevent Docker volume permission issues from blocking login
 StrictModes no
 
+# Increase logging to DEBUG3 to see exactly why it rejects the password
+LogLevel DEBUG3
+
 # SFTP subsystem
 Subsystem sftp internal-sftp
 
