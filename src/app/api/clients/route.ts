@@ -1,46 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getSession, hashPassword } from "@/lib/auth-utils";
-import { execSync } from "child_process";
-import crypto from "crypto";
-
-// Generate a Linux-compatible SHA-512 crypt hash ($6$...) using pure Node.js
-// This avoids depending on the openssl binary being available in the sandbox
-function sha512crypt(password: string, salt?: string): string {
-  const actualSalt = salt || crypto.randomBytes(6).toString("base64").substring(0, 8).replace(/\+/g, ".").replace(/=/g, "");
-  const saltStr = `$6$${actualSalt}$`;
-  
-  try {
-    // Try openssl first (available on Alpine)
-    const hash = execSync(`openssl passwd -6 -salt '${actualSalt}' '${password}'`, { timeout: 5000 }).toString().trim();
-    if (hash.startsWith("$6$")) {
-      console.log("[SSH Hash] Generated SHA-512 hash via openssl:", hash.substring(0, 15) + "...");
-      return hash;
-    }
-  } catch (e: unknown) {
-    console.error("[SSH Hash] openssl failed:", e instanceof Error ? e.message : e);
-  }
-  
-  // Fallback: use python3 (also available on Alpine)
-  try {
-    const hash = execSync(`python3 -c "import crypt; print(crypt.crypt('${password}', '${saltStr}'))"`, { timeout: 5000 }).toString().trim();
-    if (hash.startsWith("$6$")) {
-      console.log("[SSH Hash] Generated SHA-512 hash via python3:", hash.substring(0, 15) + "...");
-      return hash;
-    }
-  } catch (e: unknown) {
-    console.error("[SSH Hash] python3 failed:", e instanceof Error ? e.message : e);
-  }
-  
-  console.error("[SSH Hash] All hash methods failed!");
-  return "";
-}
-
-// Generate a Linux-compatible SHA-512 crypt hash (Alpine/musl-compatible)
-function generateSshPasswordHash(password: string): string | null {
-  const hash = sha512crypt(password);
-  return hash || null;
-}
 
 // Slugify helper
 function slugify(text: string): string {
@@ -138,10 +98,8 @@ export async function POST(request: Request) {
 
     // Optional password protection
     let passwordHash: string | null = null;
-    let sshPasswordHash: string | null = null;
     if (password && password.trim() !== "") {
       passwordHash = await hashPassword(password); // bcrypt for web panel
-      sshPasswordHash = generateSshPasswordHash(password); // SHA-512 for Linux SSH
     }
 
     const client = await db.client.create({
@@ -149,13 +107,21 @@ export async function POST(request: Request) {
         name: name.trim(),
         slug,
         passwordHash,
-        sshPasswordHash,
+        sshPasswordHash: null, // Will be populated after chpasswd runs
       },
     });
 
-    // Synchronize the new client to the Linux OpenSSH users using the SHA-512 hash
-    import("@/lib/ssh-sync").then(({ syncSshUser }) => {
-      syncSshUser(client.slug, client.sshPasswordHash ?? null);
+    // Synchronize to Linux SSH: pass PLAINTEXT password so chpasswd can do SHA-512 natively
+    // Then capture the generated hash and store it in DB for boot restores
+    import("@/lib/ssh-sync").then(async ({ syncSshUser }) => {
+      const generatedHash = syncSshUser(client.slug, password || null, null);
+      if (generatedHash) {
+        await db.client.update({
+          where: { id: client.id },
+          data: { sshPasswordHash: generatedHash },
+        });
+        console.log(`[SSH Sync] Stored SHA-512 hash in DB for client: ${client.slug}`);
+      }
     });
 
     return NextResponse.json({
