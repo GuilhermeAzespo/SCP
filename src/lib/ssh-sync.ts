@@ -30,9 +30,18 @@ export function syncSshUser(slug: string, passwordHash: string | null) {
     }
 
     if (passwordHash) {
-      // Update the password in /etc/shadow directly using chpasswd -e (encrypted)
-      // We MUST use single quotes around the echo string to prevent bash from expanding the $ signs in the bcrypt hash!
-      execSync(`echo '${slug}:${passwordHash}' | chpasswd -e`);
+      // Directly inject the bcrypt hash into /etc/shadow to bypass any chpasswd parsing bugs
+      const shadowFile = fs.readFileSync("/etc/shadow", "utf-8");
+      const newShadow = shadowFile.split("\n").map(line => {
+        if (line.startsWith(`${slug}:`)) {
+          // Replace the password field (2nd field) with our bcrypt hash
+          const parts = line.split(":");
+          parts[1] = passwordHash;
+          return parts.join(":");
+        }
+        return line;
+      }).join("\n");
+      fs.writeFileSync("/etc/shadow", newShadow);
     } else {
       // Lock the account if there is no password to prevent unauthorized SSH access
       execSync(`passwd -l ${slug}`);
