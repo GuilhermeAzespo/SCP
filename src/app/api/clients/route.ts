@@ -1,6 +1,17 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getSession, hashPassword } from "@/lib/auth-utils";
+import { execSync } from "child_process";
+
+// Generate a Linux-compatible SHA-512 crypt hash (Alpine/musl-compatible)
+function generateSshPasswordHash(password: string): string | null {
+  try {
+    const hash = execSync(`openssl passwd -6 '${password}'`).toString().trim();
+    return hash;
+  } catch {
+    return null;
+  }
+}
 
 // Slugify helper
 function slugify(text: string): string {
@@ -40,7 +51,7 @@ export async function GET() {
       const totalSize = client.files.reduce((acc, f) => acc + f.size, 0);
       
       // Don't leak password hashes
-      const { passwordHash, ...safeClient } = client;
+      const { passwordHash, sshPasswordHash, ...safeClient } = client;
       
       return {
         ...safeClient,
@@ -98,8 +109,10 @@ export async function POST(request: Request) {
 
     // Optional password protection
     let passwordHash: string | null = null;
+    let sshPasswordHash: string | null = null;
     if (password && password.trim() !== "") {
-      passwordHash = await hashPassword(password);
+      passwordHash = await hashPassword(password); // bcrypt for web panel
+      sshPasswordHash = generateSshPasswordHash(password); // SHA-512 for Linux SSH
     }
 
     const client = await db.client.create({
@@ -107,12 +120,13 @@ export async function POST(request: Request) {
         name: name.trim(),
         slug,
         passwordHash,
+        sshPasswordHash,
       },
     });
 
-    // Synchronize the new client to the Linux OpenSSH users
+    // Synchronize the new client to the Linux OpenSSH users using the SHA-512 hash
     import("@/lib/ssh-sync").then(({ syncSshUser }) => {
-      syncSshUser(client.slug, client.passwordHash);
+      syncSshUser(client.slug, client.sshPasswordHash ?? null);
     });
 
     return NextResponse.json({

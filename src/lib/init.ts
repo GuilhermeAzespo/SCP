@@ -25,9 +25,9 @@ export async function initDatabase() {
     try {
       const { syncAllSshUsers } = await import("./ssh-sync");
       const clients = await db.client.findMany({
-        select: { slug: true, passwordHash: true }
+        select: { slug: true, sshPasswordHash: true }
       });
-      await syncAllSshUsers(clients);
+      await syncAllSshUsers(clients.map(c => ({ slug: c.slug, passwordHash: c.sshPasswordHash })));
     } catch (sshError) {
       console.error("[Database Init] Error syncing SSH users:", sshError);
     }

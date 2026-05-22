@@ -15,13 +15,14 @@ model User {
 }
 
 model Client {
-  id           String   @id @default(uuid())
-  name         String
-  slug         String   @unique
-  passwordHash String?  // Optional password to view the client shared files
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  files        File[]
+  id              String   @id @default(uuid())
+  name            String
+  slug            String   @unique
+  passwordHash    String?  // bcrypt hash for web panel authentication
+  sshPasswordHash String?  // SHA-512 crypt hash for Linux/OpenSSH authentication
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  files           File[]
 }
 
 model File {
