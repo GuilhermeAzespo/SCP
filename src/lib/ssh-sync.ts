@@ -31,8 +31,8 @@ export function syncSshUser(slug: string, passwordHash: string | null) {
 
     if (passwordHash) {
       // Update the password in /etc/shadow directly using chpasswd -e (encrypted)
-      // Alpine's musl libc supports $2a$ (bcrypt) hashes natively!
-      execSync(`echo "${slug}:${passwordHash}" | chpasswd -e`);
+      // We MUST use single quotes around the echo string to prevent bash from expanding the $ signs in the bcrypt hash!
+      execSync(`echo '${slug}:${passwordHash}' | chpasswd -e`);
     } else {
       // Lock the account if there is no password to prevent unauthorized SSH access
       execSync(`passwd -l ${slug}`);
