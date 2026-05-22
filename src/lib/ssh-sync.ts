@@ -1,4 +1,4 @@
-import { execSync, spawnSync } from "child_process";
+import { execSync } from "child_process";
 import fs from "fs";
 
 /**
@@ -33,27 +33,22 @@ export function syncSshUser(
     }
 
     if (plainPassword) {
-      // Use spawnSync to pipe credentials directly to chpasswd, avoiding shell escaping issues
-      const result = spawnSync("chpasswd", ["-c", "SHA512"], {
-        input: `${slug}:${plainPassword}\n`,
-        encoding: "utf8",
-        timeout: 5000,
-      });
-      
-      if (result.error) {
-        console.error(`[SSH Sync] chpasswd spawn error for ${slug}:`, result.error.message);
-      } else if (result.status !== 0) {
-        console.error(`[SSH Sync] chpasswd failed for ${slug} (exit ${result.status}):`, result.stderr);
-      } else {
+      // Use execSync with echo to pass the password.
+      // This uses Alpine's default hashing (usually MD5 $1$ or SHA-256) which is perfectly compatible with OpenSSH.
+      try {
+        execSync(`echo "${slug}:${plainPassword}" | chpasswd`);
         console.log(`[SSH Sync] Set password via chpasswd for: ${slug}`);
+      } catch (e: any) {
+        console.error(`[SSH Sync] chpasswd failed for ${slug}:`, e?.message || e);
+        throw e; // throw to be caught by the outer catch block
       }
 
-      // Read back the generated SHA-512 hash from /etc/shadow for persistence
+      // Read back the generated hash from /etc/shadow for persistence
       const shadowFile = fs.readFileSync("/etc/shadow", "utf-8");
       const shadowLine = shadowFile.split("\n").find(line => line.startsWith(`${slug}:`));
       if (shadowLine) {
         const generatedHash = shadowLine.split(":")[1];
-        console.log(`[SSH Sync] Captured SHA-512 hash for DB persistence: ${slug}`);
+        console.log(`[SSH Sync] Captured hash for DB persistence: ${slug}`);
         execSync(`chown -R ${slug}:${slug} ${homeDir}`);
         return generatedHash; // Return for storage in DB
       }
