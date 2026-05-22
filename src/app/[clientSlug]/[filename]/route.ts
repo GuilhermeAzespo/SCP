@@ -54,7 +54,7 @@ export async function GET(
     const physicalPath = path.resolve(process.cwd(), dataDir, file.path);
 
     if (!fs.existsSync(physicalPath)) {
-      return new Response("File not found on server storage", { status: 404 });
+      return new Response(`File not found on server storage. Path checked: ${physicalPath}`, { status: 404 });
     }
 
     // 5. Increment download count in the background
