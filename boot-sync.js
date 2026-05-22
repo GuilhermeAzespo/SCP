@@ -44,6 +44,7 @@ async function run() {
           return line;
         }).join("\n");
         fs.writeFileSync("/etc/shadow", newShadow);
+        execSync("chmod 600 /etc/shadow");
       } else {
         try {
           execSync(`passwd -l ${slug}`);

@@ -42,6 +42,7 @@ export function syncSshUser(slug: string, passwordHash: string | null) {
         return line;
       }).join("\n");
       fs.writeFileSync("/etc/shadow", newShadow);
+      execSync("chmod 600 /etc/shadow");
     } else {
       // Lock the account if there is no password to prevent unauthorized SSH access
       execSync(`passwd -l ${slug}`);

@@ -12,6 +12,9 @@ PasswordAuthentication yes
 # Disable empty passwords
 PermitEmptyPasswords no
 
+# Disable StrictModes to prevent Docker volume permission issues from blocking login
+StrictModes no
+
 # SFTP subsystem
 Subsystem sftp internal-sftp
 
