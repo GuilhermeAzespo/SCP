@@ -1,7 +1,7 @@
 FROM node:22-alpine
 
-# Install build tools for native C++ packages (required for better-sqlite3 compilation)
-RUN apk add --no-cache python3 make g++ gcc libc6-compat
+# Install build tools for native C++ packages (required for better-sqlite3 compilation) and OpenSSH for SCP server
+RUN apk add --no-cache python3 make g++ gcc libc6-compat openssh shadow
 
 WORKDIR /app
 
@@ -13,6 +13,9 @@ RUN npm ci
 
 # Copy application files
 COPY . .
+
+# Copy custom SSH configuration
+COPY sshd_config /etc/ssh/sshd_config
 
 # Set production environment variables
 ENV NODE_ENV=production
@@ -33,8 +36,8 @@ RUN mkdir -p /app/data
 # Make entrypoint executable
 RUN chmod +x entrypoint.sh
 
-# Expose Next.js server port
-EXPOSE 3000
+# Expose Next.js server port and SCP server port
+EXPOSE 3000 22
 
 # Mount persistent storage for sqlite and uploads
 VOLUME ["/app/data"]

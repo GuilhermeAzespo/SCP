@@ -1,0 +1,19 @@
+# SCP Server OpenSSH Configuration
+
+# Listen on default port
+Port 22
+
+# Disable root login for security
+PermitRootLogin no
+
+# Allow password authentication (used by IP phones)
+PasswordAuthentication yes
+
+# Disable empty passwords
+PermitEmptyPasswords no
+
+# SFTP subsystem
+Subsystem sftp internal-sftp
+
+# Optional: You can enforce stricter restrictions globally, but since 
+# clients have /bin/sh but no write access outside their homes, it's fairly safe.

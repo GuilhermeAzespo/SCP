@@ -110,6 +110,11 @@ export async function POST(request: Request) {
       },
     });
 
+    // Synchronize the new client to the Linux OpenSSH users
+    import("@/lib/ssh-sync").then(({ syncSshUser }) => {
+      syncSshUser(client.slug, client.passwordHash);
+    });
+
     return NextResponse.json({
       success: true,
       client: {

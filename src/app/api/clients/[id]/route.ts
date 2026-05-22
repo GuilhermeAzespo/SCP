@@ -38,6 +38,11 @@ export async function DELETE(
       where: { id },
     });
 
+    // Remove the Linux OpenSSH user
+    import("@/lib/ssh-sync").then(({ deleteSshUser }) => {
+      deleteSshUser(client.slug);
+    });
+
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Delete client error:", error);

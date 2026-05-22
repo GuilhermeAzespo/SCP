@@ -20,6 +20,17 @@ export async function initDatabase() {
       
       console.log("[Database Init] Default admin user created successfully.");
     }
+    
+    // Synchronize SSH users for IP Phones
+    try {
+      const { syncAllSshUsers } = await import("./ssh-sync");
+      const clients = await db.client.findMany({
+        select: { slug: true, passwordHash: true }
+      });
+      await syncAllSshUsers(clients);
+    } catch (sshError) {
+      console.error("[Database Init] Error syncing SSH users:", sshError);
+    }
   } catch (error) {
     console.error("[Database Init] Error seeding database:", error);
   }
