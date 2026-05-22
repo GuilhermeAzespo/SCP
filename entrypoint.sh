@@ -10,9 +10,7 @@ npx prisma migrate deploy
 echo "Starting OpenSSH daemon for SCP server..."
 # Generate host keys if they don't exist
 ssh-keygen -A
-# Sync users from DB to Linux
-node boot-sync.js
-# Start sshd in the background but do not detach (-D) so we can see its logs in stderr (-e)
+# Start sshd in the background (foreground mode + stderr so we see its logs)
 /usr/sbin/sshd -D -e &
 
 echo "Starting Next.js application..."
