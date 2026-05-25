@@ -7,6 +7,7 @@ import {
   Trash2, LogOut, Key, Globe, Search, Plus, 
   Check, ShieldAlert, ArrowLeft, ArrowUpRight, RefreshCw
 } from "lucide-react";
+import { toast } from "react-hot-toast";
 
 interface Client {
   id: string;
@@ -184,9 +185,9 @@ export default function AdminDashboard() {
       if (res.ok) {
         setSelectedClient(null);
         setFiles([]);
-        fetchClients();
+        toast.success("Cliente excluído com sucesso!");
       } else {
-        alert("Erro ao excluir cliente.");
+        toast.error("Erro ao excluir cliente.");
       }
     } catch (err) {
       console.error(err);
@@ -217,7 +218,7 @@ export default function AdminDashboard() {
       } else {
         setResetPasswordValue("");
         setIsResettingPassword(false);
-        alert("Senha redefinida com sucesso!");
+        toast.success("Senha redefinida com sucesso!");
         fetchClients(); // Refresh client list to update isPasswordProtected status if needed
       }
     } catch (err) {
@@ -287,12 +288,12 @@ export default function AdminDashboard() {
           }
           fetchClients();
         } else {
-          alert(`Erro ao fazer upload de ${file.name}`);
+          toast.error(`Erro ao fazer upload de ${file.name}`);
           setUploadingFiles(prev => prev.filter(name => name !== file.name));
         }
       } catch (err) {
         console.error(err);
-        alert(`Erro de rede no upload de ${file.name}`);
+        toast.error(`Erro de rede no upload de ${file.name}`);
         setUploadingFiles(prev => prev.filter(name => name !== file.name));
       }
     }
@@ -315,8 +316,9 @@ export default function AdminDashboard() {
       if (res.ok) {
         setFiles(prev => prev.filter(f => f.id !== fileId));
         fetchClients();
+        toast.success("Arquivo excluído com sucesso!");
       } else {
-        alert("Erro ao excluir arquivo.");
+        toast.error("Erro ao excluir arquivo.");
       }
     } catch (err) {
       console.error(err);
@@ -341,15 +343,15 @@ export default function AdminDashboard() {
       const res = await fetch(`/api/rsync?clientId=${selectedClient.id}`, { method: "POST" });
       const data = await res.json();
       if (res.ok && data.success) {
-        alert("Sincronização RSYNC concluída com sucesso!");
+        toast.success("Sincronização RSYNC concluída com sucesso!");
         console.log(data.results);
       } else {
         const errorMsg = data.results?.find((r: any) => !r.success)?.error || data.error || "Erro desconhecido";
-        alert("Erro na sincronização RSYNC:\n" + errorMsg);
+        toast.error("Erro na sincronização RSYNC:\n" + errorMsg);
         console.error(data);
       }
     } catch (err) {
-      alert("Erro ao conectar ao servidor para sincronização.");
+      toast.error("Erro ao conectar ao servidor para sincronização.");
     } finally {
       setIsSyncingRsync(false);
     }
@@ -365,16 +367,16 @@ export default function AdminDashboard() {
         body: JSON.stringify(rsyncForm),
       });
       if (res.ok) {
-        alert("Configurações RSYNC salvas com sucesso!");
+        toast.success("Configurações RSYNC salvas com sucesso!");
         setIsEditingRsync(false);
         fetchClients();
         // Update local selected client object
         setSelectedClient({ ...selectedClient, ...rsyncForm });
       } else {
-        alert("Erro ao salvar RSYNC");
+        toast.error("Erro ao salvar RSYNC");
       }
     } catch (err) {
-      alert("Erro de conexão");
+      toast.error("Erro de conexão");
     }
   };
 
