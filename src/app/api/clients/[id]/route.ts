@@ -67,14 +67,16 @@ export async function PATCH(
 
     const { id } = await params;
     const body = await request.json();
-    const { password } = body;
-
-    if (!password || password.length < 4) {
-      return NextResponse.json(
-        { error: "A senha deve ter pelo menos 4 caracteres" },
-        { status: 400 }
-      );
-    }
+    const { 
+      password,
+      rsyncEnabled,
+      rsyncMode,
+      rsyncCron,
+      rsyncHost,
+      rsyncUser,
+      rsyncPath,
+      rsyncSshKey
+    } = body;
 
     const client = await db.client.findUnique({
       where: { id },
@@ -84,27 +86,41 @@ export async function PATCH(
       return NextResponse.json({ error: "Cliente não encontrado" }, { status: 404 });
     }
 
-    // Hash the new password for web portal
-    const passwordHash = await bcrypt.hash(password, 10);
+    const updateData: any = {};
+
+    // Update password if provided
+    if (password !== undefined) {
+      if (password.length < 4) {
+        return NextResponse.json(
+          { error: "A senha deve ter pelo menos 4 caracteres" },
+          { status: 400 }
+        );
+      }
+      updateData.passwordHash = await bcrypt.hash(password, 10);
+      
+      const generatedHash = syncSshUser(client.slug, password, null);
+      if (generatedHash) {
+        updateData.sshPasswordHash = generatedHash;
+      }
+    }
+
+    // Update RSYNC settings if provided
+    if (rsyncEnabled !== undefined) updateData.rsyncEnabled = rsyncEnabled;
+    if (rsyncMode !== undefined) updateData.rsyncMode = rsyncMode;
+    if (rsyncCron !== undefined) updateData.rsyncCron = rsyncCron;
+    if (rsyncHost !== undefined) updateData.rsyncHost = rsyncHost;
+    if (rsyncUser !== undefined) updateData.rsyncUser = rsyncUser;
+    if (rsyncPath !== undefined) updateData.rsyncPath = rsyncPath;
+    if (rsyncSshKey !== undefined) updateData.rsyncSshKey = rsyncSshKey;
 
     await db.client.update({
       where: { id },
-      data: { passwordHash },
+      data: updateData,
     });
-
-    // Synchronize to Linux SSH with new plainPassword
-    const generatedHash = syncSshUser(client.slug, password, null);
-    if (generatedHash) {
-      await db.client.update({
-        where: { id },
-        data: { sshPasswordHash: generatedHash },
-      });
-      console.log(`[SSH Sync] Updated SHA-512 hash in DB for client: ${client.slug}`);
-    }
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Reset password error:", error);
+    console.error("Update client error:", error);
     return NextResponse.json(
       { error: "An unexpected error occurred" },
       { status: 500 }

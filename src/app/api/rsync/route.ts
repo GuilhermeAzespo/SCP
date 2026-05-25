@@ -11,8 +11,9 @@ export async function POST(request: Request) {
 
     const { searchParams } = new URL(request.url);
     const modeOverride = searchParams.get("mode") as SyncMode | null;
+    const clientId = searchParams.get("clientId") || undefined;
 
-    const results = await runRsync(modeOverride || undefined);
+    const results = await runRsync(clientId, modeOverride || undefined);
     
     const hasError = results.some(r => !r.success);
 

@@ -16,6 +16,13 @@ interface Client {
   fileCount: number;
   totalSize: number;
   createdAt: string;
+  rsyncEnabled: boolean;
+  rsyncMode: string;
+  rsyncCron: string | null;
+  rsyncHost: string | null;
+  rsyncUser: string | null;
+  rsyncPath: string | null;
+  rsyncSshKey: string | null;
 }
 
 interface FileItem {
@@ -54,6 +61,16 @@ export default function AdminDashboard() {
   
   // RSYNC State
   const [isSyncingRsync, setIsSyncingRsync] = useState(false);
+  const [isEditingRsync, setIsEditingRsync] = useState(false);
+  const [rsyncForm, setRsyncForm] = useState({
+    rsyncEnabled: false,
+    rsyncMode: "push",
+    rsyncCron: "",
+    rsyncHost: "",
+    rsyncUser: "",
+    rsyncPath: "",
+    rsyncSshKey: ""
+  });
   
   // Drag & drop file ref
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -108,6 +125,16 @@ export default function AdminDashboard() {
     };
     
     fetchFiles();
+    setRsyncForm({
+      rsyncEnabled: selectedClient.rsyncEnabled || false,
+      rsyncMode: selectedClient.rsyncMode || "push",
+      rsyncCron: selectedClient.rsyncCron || "",
+      rsyncHost: selectedClient.rsyncHost || "",
+      rsyncUser: selectedClient.rsyncUser || "",
+      rsyncPath: selectedClient.rsyncPath || "",
+      rsyncSshKey: selectedClient.rsyncSshKey || ""
+    });
+    setIsEditingRsync(false);
   }, [selectedClient]);
 
   // 4. Create new client
@@ -308,9 +335,10 @@ export default function AdminDashboard() {
 
   // RSYNC Manual Trigger
   const handleRsyncSync = async () => {
+    if (!selectedClient) return;
     setIsSyncingRsync(true);
     try {
-      const res = await fetch("/api/rsync", { method: "POST" });
+      const res = await fetch(`/api/rsync?clientId=${selectedClient.id}`, { method: "POST" });
       const data = await res.json();
       if (res.ok && data.success) {
         alert("Sincronização RSYNC concluída com sucesso!");
@@ -324,6 +352,29 @@ export default function AdminDashboard() {
       alert("Erro ao conectar ao servidor para sincronização.");
     } finally {
       setIsSyncingRsync(false);
+    }
+  };
+
+  const handleSaveRsync = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedClient) return;
+    try {
+      const res = await fetch(`/api/clients/${selectedClient.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(rsyncForm),
+      });
+      if (res.ok) {
+        alert("Configurações RSYNC salvas com sucesso!");
+        setIsEditingRsync(false);
+        fetchClients();
+        // Update local selected client object
+        setSelectedClient({ ...selectedClient, ...rsyncForm });
+      } else {
+        alert("Erro ao salvar RSYNC");
+      }
+    } catch (err) {
+      alert("Erro de conexão");
     }
   };
 
@@ -400,15 +451,6 @@ export default function AdminDashboard() {
             <h3 style={{ fontSize: "1.125rem" }}>SCP Dashboard</h3>
           </div>
           <div style={{ display: "flex", gap: "8px" }}>
-            <button 
-              onClick={handleRsyncSync}
-              className="btn btn-secondary" 
-              title="Sincronizar Arquivos (RSYNC)"
-              disabled={isSyncingRsync}
-              style={{ padding: "8px", borderRadius: "8px", opacity: isSyncingRsync ? 0.5 : 1, cursor: isSyncingRsync ? "not-allowed" : "pointer" }}
-            >
-              <RefreshCw size={16} className={isSyncingRsync ? "animate-spin" : ""} />
-            </button>
             <button 
               onClick={handleLogout}
               className="btn btn-secondary" 
@@ -614,6 +656,14 @@ export default function AdminDashboard() {
                 
                 <div style={{ display: "flex", gap: "10px" }}>
                   <button 
+                    onClick={() => setIsEditingRsync(!isEditingRsync)}
+                    className="btn btn-secondary"
+                    style={{ padding: "10px 14px", fontSize: "0.8125rem", background: selectedClient.rsyncEnabled ? "rgba(99, 102, 241, 0.1)" : undefined }}
+                  >
+                    <RefreshCw size={16} style={{ color: selectedClient.rsyncEnabled ? "var(--accent-primary)" : undefined }} />
+                    <span>RSYNC</span>
+                  </button>
+                  <button 
                     onClick={() => setIsResettingPassword(true)}
                     className="btn btn-secondary"
                     style={{ padding: "10px 14px", fontSize: "0.8125rem" }}
@@ -680,6 +730,132 @@ export default function AdminDashboard() {
                   </a>
                 </div>
               </div>
+
+              {/* RSYNC Configuration Panel */}
+              {isEditingRsync && (
+                <div style={{ 
+                  background: "rgba(0,0,0,0.2)", 
+                  border: "1px solid var(--glass-border)", 
+                  borderRadius: "var(--border-radius-md)", 
+                  padding: "1.5rem",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "1.5rem"
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <h3 style={{ fontSize: "1.125rem", display: "flex", alignItems: "center", gap: "8px" }}>
+                      <RefreshCw size={18} style={{ color: "var(--accent-primary)" }} /> Configuração de RSYNC
+                    </h3>
+                    <div style={{ display: "flex", gap: "10px" }}>
+                      <button 
+                        onClick={handleRsyncSync}
+                        className="btn btn-secondary" 
+                        title="Sincronizar Arquivos Agora"
+                        disabled={isSyncingRsync || !selectedClient.rsyncEnabled}
+                        style={{ padding: "8px 12px", borderRadius: "8px", opacity: isSyncingRsync || !selectedClient.rsyncEnabled ? 0.5 : 1, cursor: isSyncingRsync || !selectedClient.rsyncEnabled ? "not-allowed" : "pointer", fontSize: "0.8125rem" }}
+                      >
+                        <RefreshCw size={14} className={isSyncingRsync ? "animate-spin" : ""} /> Sincronizar Agora
+                      </button>
+                    </div>
+                  </div>
+
+                  <form onSubmit={handleSaveRsync} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+                    <div style={{ display: "flex", gap: "1rem", alignItems: "center" }}>
+                      <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "0.875rem", cursor: "pointer" }}>
+                        <input 
+                          type="checkbox" 
+                          checked={rsyncForm.rsyncEnabled} 
+                          onChange={(e) => setRsyncForm({...rsyncForm, rsyncEnabled: e.target.checked})} 
+                          style={{ width: "16px", height: "16px", accentColor: "var(--accent-primary)" }}
+                        />
+                        Habilitar Sincronização RSYNC para este cliente
+                      </label>
+                    </div>
+
+                    {rsyncForm.rsyncEnabled && (
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
+                        <div className="form-group">
+                          <label className="form-label" style={{ fontSize: "0.75rem" }}>Modo de Sincronismo</label>
+                          <select 
+                            className="form-input" 
+                            value={rsyncForm.rsyncMode} 
+                            onChange={(e) => setRsyncForm({...rsyncForm, rsyncMode: e.target.value})}
+                            style={{ padding: "8px 12px", fontSize: "0.875rem" }}
+                          >
+                            <option value="push">Enviar (Push / Espelhar Local no Remoto)</option>
+                            <option value="pull">Receber (Pull / Baixar do Remoto para Local)</option>
+                            <option value="both">Ambos (Push e Pull)</option>
+                          </select>
+                        </div>
+                        <div className="form-group">
+                          <label className="form-label" style={{ fontSize: "0.75rem" }}>Cron (Opcional) <small>ex: 0 * * * * (a cada 1 hora)</small></label>
+                          <input 
+                            type="text" 
+                            className="form-input" 
+                            placeholder="Deixe em branco para sincronismo apenas manual"
+                            value={rsyncForm.rsyncCron} 
+                            onChange={(e) => setRsyncForm({...rsyncForm, rsyncCron: e.target.value})}
+                            style={{ padding: "8px 12px", fontSize: "0.875rem" }}
+                          />
+                        </div>
+                        <div className="form-group">
+                          <label className="form-label" style={{ fontSize: "0.75rem" }}>Host (IP / Domínio)</label>
+                          <input 
+                            type="text" 
+                            className="form-input" 
+                            placeholder="ex: 192.168.1.100"
+                            value={rsyncForm.rsyncHost} 
+                            onChange={(e) => setRsyncForm({...rsyncForm, rsyncHost: e.target.value})}
+                            required={rsyncForm.rsyncEnabled}
+                            style={{ padding: "8px 12px", fontSize: "0.875rem" }}
+                          />
+                        </div>
+                        <div className="form-group">
+                          <label className="form-label" style={{ fontSize: "0.75rem" }}>Usuário SSH</label>
+                          <input 
+                            type="text" 
+                            className="form-input" 
+                            placeholder="ex: root"
+                            value={rsyncForm.rsyncUser} 
+                            onChange={(e) => setRsyncForm({...rsyncForm, rsyncUser: e.target.value})}
+                            required={rsyncForm.rsyncEnabled}
+                            style={{ padding: "8px 12px", fontSize: "0.875rem" }}
+                          />
+                        </div>
+                        <div className="form-group" style={{ gridColumn: "span 2" }}>
+                          <label className="form-label" style={{ fontSize: "0.75rem" }}>Caminho no Servidor Remoto</label>
+                          <input 
+                            type="text" 
+                            className="form-input" 
+                            placeholder="ex: /backup/cliente-a"
+                            value={rsyncForm.rsyncPath} 
+                            onChange={(e) => setRsyncForm({...rsyncForm, rsyncPath: e.target.value})}
+                            required={rsyncForm.rsyncEnabled}
+                            style={{ padding: "8px 12px", fontSize: "0.875rem" }}
+                          />
+                        </div>
+                        <div className="form-group" style={{ gridColumn: "span 2" }}>
+                          <label className="form-label" style={{ fontSize: "0.75rem" }}>Chave SSH Privada (id_rsa)</label>
+                          <textarea 
+                            className="form-input" 
+                            placeholder="-----BEGIN OPENSSH PRIVATE KEY-----..."
+                            value={rsyncForm.rsyncSshKey} 
+                            onChange={(e) => setRsyncForm({...rsyncForm, rsyncSshKey: e.target.value})}
+                            rows={3}
+                            style={{ padding: "8px 12px", fontSize: "0.8125rem", fontFamily: "var(--font-mono)" }}
+                          />
+                        </div>
+                      </div>
+                    )}
+                    
+                    <div style={{ display: "flex", gap: "10px", marginTop: "0.5rem" }}>
+                      <button type="submit" className="btn btn-primary" style={{ padding: "8px 16px", fontSize: "0.875rem" }}>
+                        Salvar Configurações RSYNC
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              )}
             </div>
 
             {/* Drag & Drop Upload Zone */}

@@ -72,13 +72,6 @@ Se você deseja personalizar o acesso do administrador inicial ou definir uma se
    - `ADMIN_USERNAME`: O nome de usuário para acessar o painel `/admin` (Padrão caso não definido: `admin`).
    - `ADMIN_PASSWORD`: A senha para acessar o painel `/admin` (Padrão caso não definido: `admin`).
    - `JWT_SECRET`: Insira uma sequência de caracteres aleatórios seguros (usada para criptografar as sessões).
-   - `RSYNC_ENABLED`: `true` ou `false` para habilitar a sincronização.
-   - `RSYNC_MODE`: `push` (enviar), `pull` (receber) ou `both` (ambos).
-   - `RSYNC_HOST`: IP ou domínio do servidor remoto alvo.
-   - `RSYNC_USER`: Usuário SSH do servidor remoto.
-   - `RSYNC_PATH`: Caminho da pasta no servidor remoto (ex: `/backup/scp`).
-   - `RSYNC_SSH_KEY`: Chave privada SSH do usuário.
-   - `RSYNC_CRON`: (Opcional) Expressão Cron para sincronização automática (ex: `0 3 * * *` para rodar às 3AM).
 3. Clique em **Save** (Salvar).
 
 > 💡 **Nota**: O sistema é auto-regenerativo. Na primeira vez que ele iniciar com o banco de dados vazio, ele lerá essas variáveis de ambiente e criará o usuário administrador inicial de forma automática no banco persistente!

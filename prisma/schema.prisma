@@ -22,6 +22,16 @@ model Client {
   sshPasswordHash String?  // SHA-512 crypt hash for Linux/OpenSSH authentication
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+  
+  // RSYNC Configurations
+  rsyncEnabled    Boolean  @default(false)
+  rsyncMode       String   @default("push") // push, pull, both
+  rsyncCron       String?  // cron expression
+  rsyncHost       String?
+  rsyncUser       String?
+  rsyncPath       String?
+  rsyncSshKey     String?
+
   files           File[]
 }
 
