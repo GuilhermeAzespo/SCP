@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { 
   FolderPlus, FolderOpen, FileText, Upload, Copy, 
   Trash2, LogOut, Key, Globe, Search, Plus, 
-  Check, ShieldAlert, ArrowLeft, ArrowUpRight
+  Check, ShieldAlert, ArrowLeft, ArrowUpRight, RefreshCw
 } from "lucide-react";
 
 interface Client {
@@ -51,6 +51,9 @@ export default function AdminDashboard() {
   // Notification states
   const [copiedStates, setCopiedStates] = useState<{ [key: string]: boolean }>({});
   const [generalError, setGeneralError] = useState<string | null>(null);
+  
+  // RSYNC State
+  const [isSyncingRsync, setIsSyncingRsync] = useState(false);
   
   // Drag & drop file ref
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -303,6 +306,27 @@ export default function AdminDashboard() {
     }
   };
 
+  // RSYNC Manual Trigger
+  const handleRsyncSync = async () => {
+    setIsSyncingRsync(true);
+    try {
+      const res = await fetch("/api/rsync", { method: "POST" });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        alert("Sincronização RSYNC concluída com sucesso!");
+        console.log(data.results);
+      } else {
+        const errorMsg = data.results?.find((r: any) => !r.success)?.error || data.error || "Erro desconhecido";
+        alert("Erro na sincronização RSYNC:\n" + errorMsg);
+        console.error(data);
+      }
+    } catch (err) {
+      alert("Erro ao conectar ao servidor para sincronização.");
+    } finally {
+      setIsSyncingRsync(false);
+    }
+  };
+
   // 9. Copy to clipboard helper
   const copyToClipboard = (text: string, id: string) => {
     navigator.clipboard.writeText(text);
@@ -375,14 +399,25 @@ export default function AdminDashboard() {
             </div>
             <h3 style={{ fontSize: "1.125rem" }}>SCP Dashboard</h3>
           </div>
-          <button 
-            onClick={handleLogout}
-            className="btn btn-secondary" 
-            title="Sair da conta"
-            style={{ padding: "8px", borderRadius: "8px" }}
-          >
-            <LogOut size={16} />
-          </button>
+          <div style={{ display: "flex", gap: "8px" }}>
+            <button 
+              onClick={handleRsyncSync}
+              className="btn btn-secondary" 
+              title="Sincronizar Arquivos (RSYNC)"
+              disabled={isSyncingRsync}
+              style={{ padding: "8px", borderRadius: "8px", opacity: isSyncingRsync ? 0.5 : 1, cursor: isSyncingRsync ? "not-allowed" : "pointer" }}
+            >
+              <RefreshCw size={16} className={isSyncingRsync ? "animate-spin" : ""} />
+            </button>
+            <button 
+              onClick={handleLogout}
+              className="btn btn-secondary" 
+              title="Sair da conta"
+              style={{ padding: "8px", borderRadius: "8px" }}
+            >
+              <LogOut size={16} />
+            </button>
+          </div>
         </div>
 
         {/* User profile bar */}

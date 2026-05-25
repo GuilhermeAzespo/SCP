@@ -17,5 +17,8 @@ ssh-keygen -A
 # Start sshd in the background (foreground mode + stderr so we see its logs)
 /usr/sbin/sshd -D -e &
 
+echo "Starting RSYNC background cron service..."
+node rsync-cron.js &
+
 echo "Starting Next.js application..."
 exec npm run start
