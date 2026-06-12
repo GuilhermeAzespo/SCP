@@ -11,6 +11,9 @@ npx prisma migrate deploy
 # This is idempotent - if the column already exists, the command fails silently
 sqlite3 /app/data/dev.db "ALTER TABLE Client ADD COLUMN sshPasswordHash TEXT;" 2>/dev/null || true
 
+# Safety: ensure rsyncSshPassword column exists (handles upgrades from older installs)
+sqlite3 /app/data/dev.db "ALTER TABLE Client ADD COLUMN rsyncSshPassword TEXT;" 2>/dev/null || true
+
 echo "Starting OpenSSH daemon for SCP server..."
 # Generate host keys if they don't exist
 ssh-keygen -A
