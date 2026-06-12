@@ -65,6 +65,7 @@ export default function AdminDashboard() {
   // RSYNC State
   const [isSyncingRsync, setIsSyncingRsync] = useState(false);
   const [isEditingRsync, setIsEditingRsync] = useState(false);
+  const [rsyncLastResult, setRsyncLastResult] = useState<{success: boolean; error?: string; logs?: string} | null>(null);
   const [rsyncForm, setRsyncForm] = useState({
     rsyncEnabled: false,
     rsyncMode: "push",
@@ -346,18 +347,29 @@ export default function AdminDashboard() {
     if (!selectedClient) return;
     setIsSyncingRsync(true);
     try {
-      const res = await fetch(`/api/rsync?clientId=${selectedClient.id}`, { method: "POST" });
+      // Pass the current form mode so "Sincronizar Agora" respects what's configured
+      const res = await fetch(
+        `/api/rsync?clientId=${selectedClient.id}&mode=${rsyncForm.rsyncMode}`,
+        { method: "POST" }
+      );
       const data = await res.json();
       if (res.ok && data.success) {
+        const logs = data.results?.map((r: any) => r.logs).filter(Boolean).join("\n") || "";
         toast.success("Sincronização RSYNC concluída com sucesso!");
-        console.log(data.results);
+        if (logs) console.info("[RSYNC LOGS]\n" + logs);
+        setRsyncLastResult({ success: true, logs });
       } else {
-        const errorMsg = data.results?.find((r: any) => !r.success)?.error || data.error || "Erro desconhecido";
-        toast.error("Erro na sincronização RSYNC:\n" + errorMsg);
-        console.error(data);
+        const failedResult = data.results?.find((r: any) => !r.success);
+        const errorMsg = failedResult?.error || data.error || data.details || "Erro desconhecido";
+        const logOutput = failedResult?.logs || "";
+        toast.error("Erro RSYNC: " + errorMsg, { duration: 8000 });
+        console.error("[RSYNC ERROR]", { error: errorMsg, logs: logOutput, raw: data });
+        setRsyncLastResult({ success: false, error: errorMsg, logs: logOutput });
       }
     } catch (err) {
       toast.error("Erro ao conectar ao servidor para sincronização.");
+      console.error("[RSYNC FETCH ERROR]", err);
+      setRsyncLastResult({ success: false, error: String(err) });
     } finally {
       setIsSyncingRsync(false);
     }
@@ -759,13 +771,39 @@ export default function AdminDashboard() {
                         onClick={handleRsyncSync}
                         className="btn btn-secondary" 
                         title="Sincronizar Arquivos Agora"
-                        disabled={isSyncingRsync || !selectedClient.rsyncEnabled}
-                        style={{ padding: "8px 12px", borderRadius: "8px", opacity: isSyncingRsync || !selectedClient.rsyncEnabled ? 0.5 : 1, cursor: isSyncingRsync || !selectedClient.rsyncEnabled ? "not-allowed" : "pointer", fontSize: "0.8125rem" }}
+                        disabled={isSyncingRsync || !rsyncForm.rsyncEnabled}
+                        style={{ padding: "8px 12px", borderRadius: "8px", opacity: isSyncingRsync || !rsyncForm.rsyncEnabled ? 0.5 : 1, cursor: isSyncingRsync || !rsyncForm.rsyncEnabled ? "not-allowed" : "pointer", fontSize: "0.8125rem" }}
                       >
                         <RefreshCw size={14} className={isSyncingRsync ? "animate-spin" : ""} /> Sincronizar Agora
                       </button>
                     </div>
                   </div>
+
+                  {/* Sync result log panel */}
+                  {rsyncLastResult && (
+                    <div style={{
+                      background: rsyncLastResult.success ? "rgba(34,197,94,0.06)" : "rgba(239,68,68,0.06)",
+                      border: `1px solid ${rsyncLastResult.success ? "rgba(34,197,94,0.2)" : "rgba(239,68,68,0.2)"}`,
+                      borderRadius: "var(--border-radius-md)",
+                      padding: "1rem 1.25rem",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "8px"
+                    }}>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                        <span style={{ fontSize: "0.75rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: rsyncLastResult.success ? "var(--accent-success)" : "var(--accent-danger)" }}>
+                          {rsyncLastResult.success ? "✅ Última Sincronização: Sucesso" : "❌ Última Sincronização: Falhou"}
+                        </span>
+                        <button onClick={() => setRsyncLastResult(null)} style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", fontSize: "1rem", lineHeight: 1 }}>✕</button>
+                      </div>
+                      {rsyncLastResult.error && (
+                        <p style={{ fontSize: "0.8125rem", color: "var(--accent-danger)", margin: 0, wordBreak: "break-all" }}>{rsyncLastResult.error}</p>
+                      )}
+                      {rsyncLastResult.logs && (
+                        <pre style={{ fontSize: "0.75rem", color: "var(--text-secondary)", margin: 0, whiteSpace: "pre-wrap", wordBreak: "break-all", maxHeight: "200px", overflowY: "auto", background: "rgba(0,0,0,0.3)", padding: "10px", borderRadius: "6px" }}>{rsyncLastResult.logs}</pre>
+                      )}
+                    </div>
+                  )}
 
                   <form onSubmit={handleSaveRsync} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
                     <div style={{ display: "flex", gap: "1rem", alignItems: "center" }}>
