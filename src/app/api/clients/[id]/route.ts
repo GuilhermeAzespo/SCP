@@ -73,6 +73,7 @@ export async function PATCH(
       rsyncMode,
       rsyncCron,
       rsyncHost,
+      rsyncSshPort,
       rsyncUser,
       rsyncPath,
       rsyncSshKey,
@@ -110,6 +111,7 @@ export async function PATCH(
     if (rsyncMode !== undefined) updateData.rsyncMode = rsyncMode;
     if (rsyncCron !== undefined) updateData.rsyncCron = rsyncCron;
     if (rsyncHost !== undefined) updateData.rsyncHost = rsyncHost;
+    if (rsyncSshPort !== undefined) updateData.rsyncSshPort = rsyncSshPort;
     if (rsyncUser !== undefined) updateData.rsyncUser = rsyncUser;
     if (rsyncPath !== undefined) updateData.rsyncPath = rsyncPath;
     if (rsyncSshKey !== undefined) updateData.rsyncSshKey = rsyncSshKey;

@@ -28,6 +28,7 @@ model Client {
   rsyncMode       String   @default("push") // push, pull, both
   rsyncCron       String?  // cron expression
   rsyncHost       String?
+  rsyncSshPort    String?  // SSH port (default: 22)
   rsyncUser       String?
   rsyncPath       String?
   rsyncSshKey     String?

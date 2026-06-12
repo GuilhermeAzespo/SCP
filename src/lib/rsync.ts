@@ -36,7 +36,7 @@ export async function runRsync(clientId?: string, modeOverride?: SyncMode): Prom
     const remotePath = client.rsyncPath;
     const sshKey = client.rsyncSshKey;
     const sshPassword = client.rsyncSshPassword;
-    const port = "22"; // We can add rsyncPort to DB later if needed
+    const port = client.rsyncSshPort || "22";
     const mode: SyncMode = modeOverride || (client.rsyncMode as SyncMode) || "push";
     const clientSlug = client.slug;
     

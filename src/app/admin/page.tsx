@@ -21,6 +21,7 @@ interface Client {
   rsyncMode: string;
   rsyncCron: string | null;
   rsyncHost: string | null;
+  rsyncSshPort: string | null;
   rsyncUser: string | null;
   rsyncPath: string | null;
   rsyncSshKey: string | null;
@@ -69,6 +70,7 @@ export default function AdminDashboard() {
     rsyncMode: "push",
     rsyncCron: "",
     rsyncHost: "",
+    rsyncSshPort: "",
     rsyncUser: "",
     rsyncPath: "",
     rsyncSshKey: "",
@@ -133,6 +135,7 @@ export default function AdminDashboard() {
       rsyncMode: selectedClient.rsyncMode || "push",
       rsyncCron: selectedClient.rsyncCron || "",
       rsyncHost: selectedClient.rsyncHost || "",
+      rsyncSshPort: selectedClient.rsyncSshPort || "",
       rsyncUser: selectedClient.rsyncUser || "",
       rsyncPath: selectedClient.rsyncPath || "",
       rsyncSshKey: selectedClient.rsyncSshKey || "",
@@ -813,6 +816,19 @@ export default function AdminDashboard() {
                             onChange={(e) => setRsyncForm({...rsyncForm, rsyncHost: e.target.value})}
                             required={rsyncForm.rsyncEnabled}
                             style={{ padding: "8px 12px", fontSize: "0.875rem" }}
+                          />
+                        </div>
+                        <div className="form-group">
+                          <label className="form-label" style={{ fontSize: "0.75rem" }}>Porta SSH</label>
+                          <input 
+                            type="number" 
+                            className="form-input" 
+                            placeholder="22"
+                            value={rsyncForm.rsyncSshPort} 
+                            onChange={(e) => setRsyncForm({...rsyncForm, rsyncSshPort: e.target.value})}
+                            style={{ padding: "8px 12px", fontSize: "0.875rem" }}
+                            min="1"
+                            max="65535"
                           />
                         </div>
                         <div className="form-group">
