@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { 
   FolderPlus, FolderOpen, FileText, Upload, Copy, 
   Trash2, LogOut, Key, Globe, Search, Plus, 
-  Check, ShieldAlert, ArrowLeft, ArrowUpRight, RefreshCw
+  Check, ShieldAlert, ArrowLeft, ArrowUpRight, RefreshCw, CloudUpload
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 
@@ -61,6 +61,9 @@ export default function AdminDashboard() {
   // Notification states
   const [copiedStates, setCopiedStates] = useState<{ [key: string]: boolean }>({});
   const [generalError, setGeneralError] = useState<string | null>(null);
+
+  // Deploy state
+  const [isDeploying, setIsDeploying] = useState(false);
   
   // RSYNC State
   const [isSyncingRsync, setIsSyncingRsync] = useState(false);
@@ -342,6 +345,29 @@ export default function AdminDashboard() {
     }
   };
 
+  // Deploy via Easypanel webhook
+  const handleDeploy = async () => {
+    if (isDeploying) return;
+    const confirmed = window.confirm(
+      "Isso vai acionar um novo deploy via Easypanel.\n\nO sistema ficará indisponível por alguns minutos durante o processo.\n\nConfirmar?"
+    );
+    if (!confirmed) return;
+    setIsDeploying(true);
+    try {
+      const res = await fetch("/api/admin/deploy", { method: "POST" });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast.success("Deploy iniciado! O sistema será atualizado em instantes.", { duration: 8000 });
+      } else {
+        toast.error(data.error || "Erro ao iniciar o deploy.", { duration: 8000 });
+      }
+    } catch (err) {
+      toast.error("Erro de conexão ao acionar o deploy.");
+    } finally {
+      setIsDeploying(false);
+    }
+  };
+
   // RSYNC Manual Trigger
   const handleRsyncSync = async () => {
     if (!selectedClient) return;
@@ -471,6 +497,22 @@ export default function AdminDashboard() {
             <h3 style={{ fontSize: "1.125rem" }}>SCP Dashboard</h3>
           </div>
           <div style={{ display: "flex", gap: "8px" }}>
+            <button 
+              onClick={handleDeploy}
+              disabled={isDeploying}
+              className="btn btn-secondary" 
+              title={isDeploying ? "Iniciando deploy..." : "Atualizar sistema (Deploy)"}
+              style={{ 
+                padding: "8px", 
+                borderRadius: "8px",
+                background: isDeploying ? undefined : "rgba(234, 179, 8, 0.1)",
+                borderColor: isDeploying ? undefined : "rgba(234, 179, 8, 0.3)",
+                opacity: isDeploying ? 0.6 : 1,
+                cursor: isDeploying ? "not-allowed" : "pointer"
+              }}
+            >
+              <CloudUpload size={16} className={isDeploying ? "animate-spin" : ""} style={{ color: isDeploying ? undefined : "#eab308" }} />
+            </button>
             <button 
               onClick={handleLogout}
               className="btn btn-secondary" 
