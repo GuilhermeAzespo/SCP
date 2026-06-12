@@ -24,6 +24,7 @@ interface Client {
   rsyncUser: string | null;
   rsyncPath: string | null;
   rsyncSshKey: string | null;
+  rsyncSshPassword: string | null;
 }
 
 interface FileItem {
@@ -70,7 +71,8 @@ export default function AdminDashboard() {
     rsyncHost: "",
     rsyncUser: "",
     rsyncPath: "",
-    rsyncSshKey: ""
+    rsyncSshKey: "",
+    rsyncSshPassword: ""
   });
   
   // Drag & drop file ref
@@ -133,7 +135,8 @@ export default function AdminDashboard() {
       rsyncHost: selectedClient.rsyncHost || "",
       rsyncUser: selectedClient.rsyncUser || "",
       rsyncPath: selectedClient.rsyncPath || "",
-      rsyncSshKey: selectedClient.rsyncSshKey || ""
+      rsyncSshKey: selectedClient.rsyncSshKey || "",
+      rsyncSshPassword: selectedClient.rsyncSshPassword || ""
     });
     setIsEditingRsync(false);
   }, [selectedClient]);
@@ -837,7 +840,7 @@ export default function AdminDashboard() {
                           />
                         </div>
                         <div className="form-group" style={{ gridColumn: "span 2" }}>
-                          <label className="form-label" style={{ fontSize: "0.75rem" }}>Chave SSH Privada (id_rsa)</label>
+                          <label className="form-label" style={{ fontSize: "0.75rem" }}>Chave SSH Privada (id_rsa) <small style={{ color: "var(--accent-success)" }}>← Método preferencial</small></label>
                           <textarea 
                             className="form-input" 
                             placeholder="-----BEGIN OPENSSH PRIVATE KEY-----..."
@@ -846,6 +849,29 @@ export default function AdminDashboard() {
                             rows={3}
                             style={{ padding: "8px 12px", fontSize: "0.8125rem", fontFamily: "var(--font-mono)" }}
                           />
+                        </div>
+                        <div className="form-group" style={{ gridColumn: "span 2" }}>
+                          <label className="form-label" style={{ fontSize: "0.75rem" }}>
+                            Senha SSH
+                            {rsyncForm.rsyncSshKey
+                              ? <small style={{ marginLeft: "8px", color: "var(--text-muted)" }}>⚠ Ignorada (chave RSA tem prioridade)</small>
+                              : rsyncForm.rsyncSshPassword
+                              ? <small style={{ marginLeft: "8px", color: "var(--accent-primary)" }}>✓ Método ativo</small>
+                              : <small style={{ marginLeft: "8px", color: "var(--text-muted)" }}>Alternativa à Chave RSA</small>
+                            }
+                          </label>
+                          <div style={{ position: "relative" }}>
+                            <Key size={14} style={{ position: "absolute", left: "12px", top: "50%", transform: "translateY(-50%)", color: rsyncForm.rsyncSshKey ? "var(--text-muted)" : "var(--accent-primary)", opacity: rsyncForm.rsyncSshKey ? 0.4 : 1 }} />
+                            <input
+                              type="password"
+                              className="form-input"
+                              placeholder={rsyncForm.rsyncSshKey ? "Desabilitada (usando chave RSA)" : "Senha do usuário SSH remoto"}
+                              value={rsyncForm.rsyncSshPassword}
+                              onChange={(e) => setRsyncForm({...rsyncForm, rsyncSshPassword: e.target.value})}
+                              disabled={!!rsyncForm.rsyncSshKey}
+                              style={{ padding: "8px 12px 8px 34px", fontSize: "0.875rem", opacity: rsyncForm.rsyncSshKey ? 0.45 : 1 }}
+                            />
+                          </div>
                         </div>
                       </div>
                     )}

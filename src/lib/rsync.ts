@@ -35,6 +35,7 @@ export async function runRsync(clientId?: string, modeOverride?: SyncMode): Prom
     const user = client.rsyncUser;
     const remotePath = client.rsyncPath;
     const sshKey = client.rsyncSshKey;
+    const sshPassword = client.rsyncSshPassword;
     const port = "22"; // We can add rsyncPort to DB later if needed
     const mode: SyncMode = modeOverride || (client.rsyncMode as SyncMode) || "push";
     const clientSlug = client.slug;
@@ -52,27 +53,38 @@ export async function runRsync(clientId?: string, modeOverride?: SyncMode): Prom
       fs.mkdirSync(localPath, { recursive: true });
     }
 
+    // --- Auth method priority: RSA Key > SSH Password > None ---
     let sshCommand = `ssh -p ${port} -o StrictHostKeyChecking=no`;
+    let rsyncPrefix = "";
     const keyPath = `/tmp/rsync_id_rsa_${client.id}`;
 
     if (sshKey) {
+      // Priority 1: RSA private key (most secure)
       fs.writeFileSync(keyPath, sshKey.replace(/\\n/g, "\n"), { encoding: "utf-8", mode: 0o600 });
-      sshCommand += ` -i ${keyPath}`;
+      sshCommand += ` -i ${keyPath} -o PasswordAuthentication=no`;
+    } else if (sshPassword) {
+      // Priority 2: SSH password via sshpass
+      // Escape single quotes in password to prevent shell injection
+      const escapedPassword = sshPassword.replace(/'/g, "'\\''");
+      rsyncPrefix = `sshpass -p '${escapedPassword}' `;
+      sshCommand += ` -o PasswordAuthentication=yes`;
     }
 
     const executeSync = async (currentMode: "push" | "pull"): Promise<SyncResult> => {
       try {
         let rsyncCmd = "";
         if (currentMode === "push") {
-          rsyncCmd = `rsync -avz --delete -e "${sshCommand}" ${localPath}/ ${user}@${host}:${remotePath}/`;
+          rsyncCmd = `${rsyncPrefix}rsync -avz --delete -e "${sshCommand}" ${localPath}/ ${user}@${host}:${remotePath}/`;
         } else {
-          rsyncCmd = `rsync -avz --delete -e "${sshCommand}" ${user}@${host}:${remotePath}/ ${localPath}/`;
+          rsyncCmd = `${rsyncPrefix}rsync -avz --delete -e "${sshCommand}" ${user}@${host}:${remotePath}/ ${localPath}/`;
         }
 
         const { stdout, stderr } = await execAsync(rsyncCmd);
         return { clientId: client.id, clientSlug, mode: currentMode, success: true, logs: stdout + (stderr ? `\nErrors:\n${stderr}` : "") };
       } catch (err: any) {
-        return { clientId: client.id, clientSlug, mode: currentMode, success: false, logs: err.stdout || "", error: err.message || err.toString() };
+        // Sanitize error message to avoid leaking passwords
+        const errorMsg = (err.message || err.toString()).replace(sshPassword ? sshPassword : "", "***");
+        return { clientId: client.id, clientSlug, mode: currentMode, success: false, logs: err.stdout || "", error: errorMsg };
       }
     };
 

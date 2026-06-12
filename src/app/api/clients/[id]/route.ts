@@ -75,7 +75,8 @@ export async function PATCH(
       rsyncHost,
       rsyncUser,
       rsyncPath,
-      rsyncSshKey
+      rsyncSshKey,
+      rsyncSshPassword
     } = body;
 
     const client = await db.client.findUnique({
@@ -112,6 +113,7 @@ export async function PATCH(
     if (rsyncUser !== undefined) updateData.rsyncUser = rsyncUser;
     if (rsyncPath !== undefined) updateData.rsyncPath = rsyncPath;
     if (rsyncSshKey !== undefined) updateData.rsyncSshKey = rsyncSshKey;
+    if (rsyncSshPassword !== undefined) updateData.rsyncSshPassword = rsyncSshPassword;
 
     await db.client.update({
       where: { id },

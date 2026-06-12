@@ -31,6 +31,7 @@ model Client {
   rsyncUser       String?
   rsyncPath       String?
   rsyncSshKey     String?
+  rsyncSshPassword String? // SSH password for rsync (alternative to RSA key)
 
   files           File[]
 }
