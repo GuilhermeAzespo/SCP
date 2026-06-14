@@ -58,7 +58,7 @@ export async function runRsync(clientId?: string, modeOverride?: SyncMode): Prom
     let rsyncPrefix = "";
     const keyPath = `/tmp/rsync_id_rsa_${client.id}`;
 
-    if (sshKey) {
+    if (sshKey && sshKey.trim() !== "") {
       // Priority 1: RSA private key (most secure)
       fs.writeFileSync(keyPath, sshKey.replace(/\\n/g, "\n"), { encoding: "utf-8", mode: 0o600 });
       sshCommand += ` -i ${keyPath} -o PasswordAuthentication=no`;
