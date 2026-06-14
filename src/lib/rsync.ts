@@ -112,18 +112,20 @@ export async function runRsync(clientId?: string, modeOverride?: SyncMode): Prom
           // FTP mode via lftp
           const escapedPassword = sshPassword ? sshPassword.replace(/'/g, "'\\''") : "";
           const auth = `-u '${user}','${escapedPassword}'`;
+          const rPath = remotePath.endsWith('/') ? remotePath : remotePath + '/';
           
           if (currentMode === "push") {
-            syncCmd = `lftp -c "set ssl:verify-certificate no; open -u '${user}','${escapedPassword}' -p ${port} ftp://${host}; mirror -R --delete --verbose '${localPath}/' '${remotePath}'"`;
+            syncCmd = `lftp -c "set ssl:verify-certificate no; open -u '${user}','${escapedPassword}' -p ${port} ftp://${host}; mirror -R --delete --verbose '${localPath}/' '${rPath}'"`;
           } else {
-            syncCmd = `lftp -c "set ssl:verify-certificate no; open -u '${user}','${escapedPassword}' -p ${port} ftp://${host}; mirror --delete --verbose '${remotePath}' '${localPath}/'"`;
+            syncCmd = `lftp -c "set ssl:verify-certificate no; open -u '${user}','${escapedPassword}' -p ${port} ftp://${host}; mirror --delete --verbose '${rPath}' '${localPath}/'"`;
           }
         } else {
           // SSH/RSYNC mode
+          const rPath = remotePath.endsWith('/') ? remotePath : remotePath + '/';
           if (currentMode === "push") {
-            syncCmd = `${rsyncPrefix}rsync -avz --delete -e "${sshCommand}" ${localPath}/ ${user}@${host}:${remotePath}/`;
+            syncCmd = `${rsyncPrefix}rsync -avz --delete -e "${sshCommand}" ${localPath}/ ${user}@${host}:${rPath}`;
           } else {
-            syncCmd = `${rsyncPrefix}rsync -avz --delete -e "${sshCommand}" ${user}@${host}:${remotePath}/ ${localPath}/`;
+            syncCmd = `${rsyncPrefix}rsync -avz --delete -e "${sshCommand}" ${user}@${host}:${rPath} ${localPath}/`;
           }
         }
 
