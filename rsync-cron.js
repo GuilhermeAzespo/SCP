@@ -64,12 +64,12 @@ async function reloadTasks() {
             const auth = `-u '${user}','${escapedPassword}'`;
             if (mode === "push" || mode === "both") {
               console.log(`[RSYNC Cron] [${client.slug}] Running FTP PUSH via lftp...`);
-              const cmd = `lftp ${auth} -p ${port} -e "mirror -R --delete --verbose '${localPath}/' '${remotePath}'; quit" ftp://${host}`;
+              const cmd = `lftp -c "set ssl:verify-certificate no; open -u '${user}','${escapedPassword}' -p ${port} ftp://${host}; mirror -R --delete --verbose '${localPath}/' '${remotePath}'"`;
               execSync(cmd, { encoding: 'utf-8' });
             }
             if (mode === "pull" || mode === "both") {
               console.log(`[RSYNC Cron] [${client.slug}] Running FTP PULL via lftp...`);
-              const cmd = `lftp ${auth} -p ${port} -e "mirror --delete --verbose '${remotePath}' '${localPath}/'; quit" ftp://${host}`;
+              const cmd = `lftp -c "set ssl:verify-certificate no; open -u '${user}','${escapedPassword}' -p ${port} ftp://${host}; mirror --delete --verbose '${remotePath}' '${localPath}/'"`;
               execSync(cmd, { encoding: 'utf-8' });
             }
           } else {
