@@ -34,7 +34,8 @@ async function reloadTasks() {
         const user = client.rsyncUser;
         const remotePath = client.rsyncPath;
         const sshKey = client.rsyncSshKey;
-        const port = "22";
+        const sshPassword = client.rsyncSshPassword;
+        const port = client.rsyncSshPort || "22";
         const mode = client.rsyncMode || "push";
         const localDataDir = process.env.DATA_DIR || "/app/data";
         const localPath = path.join(localDataDir, "uploads", client.slug);
@@ -45,22 +46,27 @@ async function reloadTasks() {
         }
 
         let sshCommand = `ssh -p ${port} -o StrictHostKeyChecking=no`;
+        let rsyncPrefix = "";
         const keyPath = `/tmp/rsync_id_rsa_cron_${client.id}`;
 
-        if (sshKey) {
+        if (sshKey && sshKey.trim() !== "") {
           fs.writeFileSync(keyPath, sshKey.replace(/\\n/g, "\n"), { encoding: "utf-8", mode: 0o600 });
-          sshCommand += ` -i ${keyPath}`;
+          sshCommand += ` -i ${keyPath} -o PasswordAuthentication=no`;
+        } else if (sshPassword) {
+          const escapedPassword = sshPassword.replace(/'/g, "'\\''");
+          rsyncPrefix = `sshpass -p '${escapedPassword}' `;
+          sshCommand += ` -o PasswordAuthentication=yes`;
         }
 
         try {
           if (mode === "push" || mode === "both") {
             console.log(`[RSYNC Cron] [${client.slug}] Running PUSH...`);
-            const cmd = `rsync -avz --delete -e "${sshCommand}" ${localPath}/ ${user}@${host}:${remotePath}/`;
+            const cmd = `${rsyncPrefix}rsync -avz --delete -e "${sshCommand}" ${localPath}/ ${user}@${host}:${remotePath}/`;
             execSync(cmd, { encoding: 'utf-8' });
           }
           if (mode === "pull" || mode === "both") {
             console.log(`[RSYNC Cron] [${client.slug}] Running PULL...`);
-            const cmd = `rsync -avz --delete -e "${sshCommand}" ${user}@${host}:${remotePath}/ ${localPath}/`;
+            const cmd = `${rsyncPrefix}rsync -avz --delete -e "${sshCommand}" ${user}@${host}:${remotePath}/ ${localPath}/`;
             execSync(cmd, { encoding: 'utf-8' });
           }
           console.log(`[RSYNC Cron] [${client.slug}] Synchronization completed successfully.`);
