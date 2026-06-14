@@ -938,7 +938,7 @@ export default function AdminDashboard() {
 
                     {rsyncForm.rsyncEnabled && (
                       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
-                        <div className="form-group">
+                        <div className="form-group" style={{ gridColumn: "1 / -1" }}>
                           <label className="form-label" style={{ fontSize: "0.75rem" }}>Modo de Sincronismo</label>
                           <select 
                             className="form-input" 
@@ -951,16 +951,47 @@ export default function AdminDashboard() {
                             <option value="both">Ambos (Push e Pull)</option>
                           </select>
                         </div>
-                        <div className="form-group">
-                          <label className="form-label" style={{ fontSize: "0.75rem" }}>Cron (Opcional) <small>ex: 0 * * * * (a cada 1 hora)</small></label>
-                          <input 
-                            type="text" 
-                            className="form-input" 
-                            placeholder="Deixe em branco para sincronismo apenas manual"
-                            value={rsyncForm.rsyncCron} 
-                            onChange={(e) => setRsyncForm({...rsyncForm, rsyncCron: e.target.value})}
-                            style={{ padding: "8px 12px", fontSize: "0.875rem" }}
-                          />
+                        <div className="form-group" style={{ gridColumn: "1 / -1" }}>
+                          <label className="form-label" style={{ fontSize: "0.75rem", marginBottom: "8px" }}>Agendamento CRON (Opcional - deixe em branco para manual)</label>
+                          <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: "10px" }}>
+                            {[
+                              { label: "Minuto", placeholder: "*" },
+                              { label: "Hora", placeholder: "*" },
+                              { label: "Dia do Mês", placeholder: "*" },
+                              { label: "Mês", placeholder: "*" },
+                              { label: "Dia da Semana", placeholder: "*" }
+                            ].map((field, idx) => {
+                              const parts = rsyncForm.rsyncCron ? rsyncForm.rsyncCron.split(' ') : ['', '', '', '', ''];
+                              const val = parts[idx] || '';
+                              return (
+                                <div key={idx} style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                                  <span style={{ fontSize: "0.65rem", color: "var(--text-muted)", textTransform: "uppercase", fontWeight: 600 }}>{field.label}</span>
+                                  <input 
+                                    type="text" 
+                                    className="form-input" 
+                                    placeholder={field.placeholder}
+                                    value={val}
+                                    onChange={(e) => {
+                                      const newParts = [...parts];
+                                      while(newParts.length < 5) newParts.push('');
+                                      newParts[idx] = e.target.value;
+                                      
+                                      if (newParts.every(p => !p || p.trim() === '')) {
+                                        setRsyncForm({...rsyncForm, rsyncCron: ''});
+                                      } else {
+                                        const safeParts = newParts.map(p => p && p.trim() !== '' ? p.trim() : '*');
+                                        setRsyncForm({...rsyncForm, rsyncCron: safeParts.join(' ')});
+                                      }
+                                    }}
+                                    style={{ padding: "8px 12px", fontSize: "0.875rem", textAlign: "center", background: "rgba(255,255,255,0.03)" }}
+                                  />
+                                </div>
+                              );
+                            })}
+                          </div>
+                          <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "8px" }}>
+                            O sistema suporta a sintaxe Cron. Exemplos: <code>* * * * *</code> (a cada minuto) | <code>*/5 * * * *</code> (a cada 5 min)
+                          </div>
                         </div>
                         <div className="form-group">
                           <label className="form-label" style={{ fontSize: "0.75rem" }}>Host (IP / Domínio)</label>
