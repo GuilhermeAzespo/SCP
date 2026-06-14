@@ -2,12 +2,16 @@ const cron = require('node-cron');
 const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
-const { PrismaClient } = require('./src/generated/prisma/client/client');
-const { PrismaBetterSqlite3 } = require('@prisma/adapter-better-sqlite3');
+const { PrismaClient } = require('./src/generated/prisma/client');
 
 const dbPath = process.env.DATABASE_URL || 'file:/app/data/dev.db';
-const adapter = new PrismaBetterSqlite3({ url: dbPath });
-const prisma = new PrismaClient({ adapter });
+const prisma = new PrismaClient({
+  datasources: {
+    db: {
+      url: dbPath
+    }
+  }
+});
 
 let activeTasks = {};
 
