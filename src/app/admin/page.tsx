@@ -62,6 +62,27 @@ export default function AdminDashboard() {
   const [copiedStates, setCopiedStates] = useState<{ [key: string]: boolean }>({});
   const [generalError, setGeneralError] = useState<string | null>(null);
 
+  // Modal State
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: React.ReactNode;
+    confirmText?: string;
+    danger?: boolean;
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: "",
+    message: "",
+    onConfirm: () => {}
+  });
+
+  const showConfirm = (title: string, message: React.ReactNode, onConfirm: () => void, confirmText = "Confirmar", danger = false) => {
+    setConfirmModal({ isOpen: true, title, message, confirmText, danger, onConfirm });
+  };
+
+  const closeConfirm = () => setConfirmModal(prev => ({ ...prev, isOpen: false }));
+
   // Deploy state
   const [isDeploying, setIsDeploying] = useState(false);
   
@@ -182,26 +203,30 @@ export default function AdminDashboard() {
   };
 
   // 5. Delete client
-  const handleDeleteClient = async (client: Client) => {
-    if (!confirm(`Tem certeza que deseja excluir o cliente "${client.name}"? Todos os arquivos do cliente serão apagados permanentemente!`)) {
-      return;
-    }
+  const handleDeleteClient = (client: Client) => {
+    showConfirm(
+      "Excluir Cliente",
+      `Tem certeza que deseja excluir o cliente "${client.name}"? Todos os arquivos do cliente serão apagados permanentemente!`,
+      async () => {
+        try {
+          const res = await fetch(`/api/clients/${client.id}`, {
+            method: "DELETE",
+          });
 
-    try {
-      const res = await fetch(`/api/clients/${client.id}`, {
-        method: "DELETE",
-      });
-
-      if (res.ok) {
-        setSelectedClient(null);
-        setFiles([]);
-        toast.success("Cliente excluído com sucesso!");
-      } else {
-        toast.error("Erro ao excluir cliente.");
-      }
-    } catch (err) {
-      console.error(err);
-    }
+          if (res.ok) {
+            setSelectedClient(null);
+            setFiles([]);
+            toast.success("Cliente excluído com sucesso!");
+          } else {
+            toast.error("Erro ao excluir cliente.");
+          }
+        } catch (err) {
+          console.error(err);
+        }
+      },
+      "Excluir",
+      true
+    );
   };
 
   // 6. Reset password
@@ -315,24 +340,30 @@ export default function AdminDashboard() {
   };
 
   // 7. Delete individual file
-  const handleDeleteFile = async (fileId: string) => {
-    if (!confirm("Excluir este arquivo permanentemente?")) return;
+  const handleDeleteFile = (fileId: string) => {
+    showConfirm(
+      "Excluir Arquivo",
+      "Excluir este arquivo permanentemente?",
+      async () => {
+        try {
+          const res = await fetch(`/api/files/${fileId}`, {
+            method: "DELETE",
+          });
 
-    try {
-      const res = await fetch(`/api/files/${fileId}`, {
-        method: "DELETE",
-      });
-
-      if (res.ok) {
-        setFiles(prev => prev.filter(f => f.id !== fileId));
-        fetchClients();
-        toast.success("Arquivo excluído com sucesso!");
-      } else {
-        toast.error("Erro ao excluir arquivo.");
-      }
-    } catch (err) {
-      console.error(err);
-    }
+          if (res.ok) {
+            setFiles(prev => prev.filter(f => f.id !== fileId));
+            fetchClients();
+            toast.success("Arquivo excluído com sucesso!");
+          } else {
+            toast.error("Erro ao excluir arquivo.");
+          }
+        } catch (err) {
+          console.error(err);
+        }
+      },
+      "Excluir",
+      true
+    );
   };
 
   // 8. Logout
@@ -346,26 +377,30 @@ export default function AdminDashboard() {
   };
 
   // Deploy via Easypanel webhook
-  const handleDeploy = async () => {
+  const handleDeploy = () => {
     if (isDeploying) return;
-    const confirmed = window.confirm(
-      "Isso vai acionar um novo deploy via Easypanel.\n\nO sistema ficará indisponível por alguns minutos durante o processo.\n\nConfirmar?"
+    showConfirm(
+      "Iniciar Deploy",
+      "Isso vai acionar um novo deploy via Easypanel.\n\nO sistema ficará indisponível por alguns minutos durante o processo.\n\nConfirmar?",
+      async () => {
+        setIsDeploying(true);
+        try {
+          const res = await fetch("/api/admin/deploy", { method: "POST" });
+          const data = await res.json();
+          if (res.ok && data.success) {
+            toast.success("Deploy iniciado! O sistema será atualizado em instantes.", { duration: 8000 });
+          } else {
+            toast.error(data.error || "Erro ao iniciar o deploy.", { duration: 8000 });
+          }
+        } catch (err) {
+          toast.error("Erro de conexão ao acionar o deploy.");
+        } finally {
+          setIsDeploying(false);
+        }
+      },
+      "Iniciar Deploy",
+      false
     );
-    if (!confirmed) return;
-    setIsDeploying(true);
-    try {
-      const res = await fetch("/api/admin/deploy", { method: "POST" });
-      const data = await res.json();
-      if (res.ok && data.success) {
-        toast.success("Deploy iniciado! O sistema será atualizado em instantes.", { duration: 8000 });
-      } else {
-        toast.error(data.error || "Erro ao iniciar o deploy.", { duration: 8000 });
-      }
-    } catch (err) {
-      toast.error("Erro de conexão ao acionar o deploy.");
-    } finally {
-      setIsDeploying(false);
-    }
   };
 
   // RSYNC Manual Trigger
@@ -384,6 +419,14 @@ export default function AdminDashboard() {
         toast.success("Sincronização RSYNC concluída com sucesso!");
         if (logs) console.info("[RSYNC LOGS]\n" + logs);
         setRsyncLastResult({ success: true, logs });
+        
+        // Refresh file list automatically after sync
+        const newFilesRes = await fetch(`/api/files?clientId=${selectedClient.id}`);
+        if (newFilesRes.ok) {
+          const fileData = await newFilesRes.json();
+          setFiles(fileData.files);
+        }
+        fetchClients();
       } else {
         const failedResult = data.results?.find((r: any) => !r.success);
         const errorMsg = failedResult?.error || data.error || data.details || "Erro desconhecido";
@@ -477,6 +520,39 @@ export default function AdminDashboard() {
 
   return (
     <div style={{ display: "flex", minHeight: "100vh", background: "var(--bg-primary)" }}>
+      {/* CONFIRM MODAL OVERLAY */}
+      {confirmModal.isOpen && (
+        <div style={{
+          position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+          background: "rgba(0,0,0,0.6)", zIndex: 9999,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          backdropFilter: "blur(4px)"
+        }}>
+          <div className="glass-panel animate-fade-in" style={{
+            width: "100%", maxWidth: "420px", padding: "1.5rem",
+            display: "flex", flexDirection: "column", gap: "1rem",
+            boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.5)"
+          }}>
+            <h3 style={{ fontSize: "1.25rem", fontWeight: 600 }}>{confirmModal.title}</h3>
+            <div style={{ color: "var(--text-secondary)", fontSize: "0.9375rem", lineHeight: 1.5, whiteSpace: "pre-wrap" }}>
+              {confirmModal.message}
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", marginTop: "0.5rem" }}>
+              <button onClick={closeConfirm} className="btn btn-secondary" style={{ padding: "8px 16px" }}>
+                Cancelar
+              </button>
+              <button 
+                onClick={() => { closeConfirm(); confirmModal.onConfirm(); }} 
+                className={confirmModal.danger ? "btn btn-danger" : "btn btn-primary"}
+                style={{ padding: "8px 16px" }}
+              >
+                {confirmModal.confirmText || "Confirmar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* SIDEBAR - CLIENT LIST */}
       <aside className="glass-panel" style={{
         width: "340px",
