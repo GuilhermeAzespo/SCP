@@ -80,9 +80,9 @@ export async function runRsync(clientId?: string, modeOverride?: SyncMode): Prom
           const auth = `-u '${user}','${escapedPassword}'`;
           
           if (currentMode === "push") {
-            syncCmd = `lftp ${auth} -p ${port} -e "mirror -R --delete --verbose '${localPath}/' '${remotePath}'; quit" ftp://${host}`;
+            syncCmd = `lftp -c "set ssl:verify-certificate no; open -u '${user}','${escapedPassword}' -p ${port} ftp://${host}; mirror -R --delete --verbose '${localPath}/' '${remotePath}'"`;
           } else {
-            syncCmd = `lftp ${auth} -p ${port} -e "mirror --delete --verbose '${remotePath}' '${localPath}/'; quit" ftp://${host}`;
+            syncCmd = `lftp -c "set ssl:verify-certificate no; open -u '${user}','${escapedPassword}' -p ${port} ftp://${host}; mirror --delete --verbose '${remotePath}' '${localPath}/'"`;
           }
         } else {
           // SSH/RSYNC mode
