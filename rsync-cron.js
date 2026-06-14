@@ -59,15 +59,30 @@ async function reloadTasks() {
         }
 
         try {
-          if (mode === "push" || mode === "both") {
-            console.log(`[RSYNC Cron] [${client.slug}] Running PUSH...`);
-            const cmd = `${rsyncPrefix}rsync -avz --delete -e "${sshCommand}" ${localPath}/ ${user}@${host}:${remotePath}/`;
-            execSync(cmd, { encoding: 'utf-8' });
-          }
-          if (mode === "pull" || mode === "both") {
-            console.log(`[RSYNC Cron] [${client.slug}] Running PULL...`);
-            const cmd = `${rsyncPrefix}rsync -avz --delete -e "${sshCommand}" ${user}@${host}:${remotePath}/ ${localPath}/`;
-            execSync(cmd, { encoding: 'utf-8' });
+          if (port === "21") {
+            const escapedPassword = sshPassword ? sshPassword.replace(/'/g, "'\\''") : "";
+            const auth = `-u '${user}','${escapedPassword}'`;
+            if (mode === "push" || mode === "both") {
+              console.log(`[RSYNC Cron] [${client.slug}] Running FTP PUSH via lftp...`);
+              const cmd = `lftp ${auth} -p ${port} -e "mirror -R --delete --verbose '${localPath}/' '${remotePath}'; quit" ftp://${host}`;
+              execSync(cmd, { encoding: 'utf-8' });
+            }
+            if (mode === "pull" || mode === "both") {
+              console.log(`[RSYNC Cron] [${client.slug}] Running FTP PULL via lftp...`);
+              const cmd = `lftp ${auth} -p ${port} -e "mirror --delete --verbose '${remotePath}' '${localPath}/'; quit" ftp://${host}`;
+              execSync(cmd, { encoding: 'utf-8' });
+            }
+          } else {
+            if (mode === "push" || mode === "both") {
+              console.log(`[RSYNC Cron] [${client.slug}] Running SSH PUSH via rsync...`);
+              const cmd = `${rsyncPrefix}rsync -avz --delete -e "${sshCommand}" ${localPath}/ ${user}@${host}:${remotePath}/`;
+              execSync(cmd, { encoding: 'utf-8' });
+            }
+            if (mode === "pull" || mode === "both") {
+              console.log(`[RSYNC Cron] [${client.slug}] Running SSH PULL via rsync...`);
+              const cmd = `${rsyncPrefix}rsync -avz --delete -e "${sshCommand}" ${user}@${host}:${remotePath}/ ${localPath}/`;
+              execSync(cmd, { encoding: 'utf-8' });
+            }
           }
           console.log(`[RSYNC Cron] [${client.slug}] Synchronization completed successfully.`);
         } catch (err) {
