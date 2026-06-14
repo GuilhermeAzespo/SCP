@@ -70,6 +70,40 @@ export async function runRsync(clientId?: string, modeOverride?: SyncMode): Prom
       sshCommand += ` -o PasswordAuthentication=yes`;
     }
 
+    const syncDatabaseWithDisk = async () => {
+      if (!fs.existsSync(localPath)) return;
+      const filesOnDisk = fs.readdirSync(localPath).filter(f => fs.statSync(path.join(localPath, f)).isFile());
+      const existingDbFiles = await db.file.findMany({ where: { clientId: client.id } });
+      
+      for (const dbFile of existingDbFiles) {
+        const physicalName = path.basename(dbFile.path);
+        if (!filesOnDisk.includes(physicalName)) {
+          await db.file.delete({ where: { id: dbFile.id } });
+        }
+      }
+
+      for (const diskFile of filesOnDisk) {
+        const exists = existingDbFiles.find(f => path.basename(f.path) === diskFile);
+        const stats = fs.statSync(path.join(localPath, diskFile));
+        if (!exists) {
+          await db.file.create({
+            data: {
+              name: diskFile,
+              path: `uploads/${clientSlug}/${diskFile}`,
+              size: stats.size,
+              mimeType: "application/octet-stream",
+              clientId: client.id
+            }
+          });
+        } else if (exists.size !== stats.size) {
+          await db.file.update({
+            where: { id: exists.id },
+            data: { size: stats.size }
+          });
+        }
+      }
+    };
+
     const executeSync = async (currentMode: "push" | "pull"): Promise<SyncResult> => {
       try {
         let syncCmd = "";
@@ -108,6 +142,7 @@ export async function runRsync(clientId?: string, modeOverride?: SyncMode): Prom
     
     if (mode === "pull" || mode === "both") {
       results.push(await executeSync("pull"));
+      await syncDatabaseWithDisk();
     }
 
     if (fs.existsSync(keyPath)) {
