@@ -15,16 +15,32 @@ async function reloadTasks() {
   try {
     const clients = await prisma.client.findMany({ where: { rsyncEnabled: true } });
     
-    // Stop and delete all existing tasks to refresh configurations
+    // Create a set of current active client IDs to find ones to remove
+    const currentClientIds = new Set(clients.map(c => c.id));
     for (const taskId in activeTasks) {
-      activeTasks[taskId].stop();
-      delete activeTasks[taskId];
+      if (!currentClientIds.has(taskId)) {
+        activeTasks[taskId].task.stop();
+        delete activeTasks[taskId];
+      }
     }
 
     clients.forEach(client => {
       if (!client.rsyncCron || !cron.validate(client.rsyncCron)) {
-        // Silent ignore for invalid or missing crons
+        if (activeTasks[client.id]) {
+           activeTasks[client.id].task.stop();
+           delete activeTasks[client.id];
+        }
         return;
+      }
+
+      // If task exists and cron string hasn't changed, do nothing
+      if (activeTasks[client.id] && activeTasks[client.id].cronStr === client.rsyncCron) {
+        return;
+      }
+
+      // Stop old task if exists
+      if (activeTasks[client.id]) {
+        activeTasks[client.id].task.stop();
       }
 
       const task = cron.schedule(client.rsyncCron, () => {
@@ -141,7 +157,7 @@ async function reloadTasks() {
         }
       });
 
-      activeTasks[client.id] = task;
+      activeTasks[client.id] = { task, cronStr: client.rsyncCron };
     });
   } catch (error) {
     console.error("[RSYNC Cron] Error reloading tasks:", error);
