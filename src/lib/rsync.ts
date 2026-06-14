@@ -72,14 +72,28 @@ export async function runRsync(clientId?: string, modeOverride?: SyncMode): Prom
 
     const executeSync = async (currentMode: "push" | "pull"): Promise<SyncResult> => {
       try {
-        let rsyncCmd = "";
-        if (currentMode === "push") {
-          rsyncCmd = `${rsyncPrefix}rsync -avz --delete -e "${sshCommand}" ${localPath}/ ${user}@${host}:${remotePath}/`;
+        let syncCmd = "";
+
+        if (port === "21") {
+          // FTP mode via lftp
+          const escapedPassword = sshPassword ? sshPassword.replace(/'/g, "'\\''") : "";
+          const auth = `-u '${user}','${escapedPassword}'`;
+          
+          if (currentMode === "push") {
+            syncCmd = `lftp ${auth} -p ${port} -e "mirror -R --delete --verbose '${localPath}/' '${remotePath}'; quit" ftp://${host}`;
+          } else {
+            syncCmd = `lftp ${auth} -p ${port} -e "mirror --delete --verbose '${remotePath}' '${localPath}/'; quit" ftp://${host}`;
+          }
         } else {
-          rsyncCmd = `${rsyncPrefix}rsync -avz --delete -e "${sshCommand}" ${user}@${host}:${remotePath}/ ${localPath}/`;
+          // SSH/RSYNC mode
+          if (currentMode === "push") {
+            syncCmd = `${rsyncPrefix}rsync -avz --delete -e "${sshCommand}" ${localPath}/ ${user}@${host}:${remotePath}/`;
+          } else {
+            syncCmd = `${rsyncPrefix}rsync -avz --delete -e "${sshCommand}" ${user}@${host}:${remotePath}/ ${localPath}/`;
+          }
         }
 
-        const { stdout, stderr } = await execAsync(rsyncCmd);
+        const { stdout, stderr } = await execAsync(syncCmd);
         return { clientId: client.id, clientSlug, mode: currentMode, success: true, logs: stdout + (stderr ? `\nErrors:\n${stderr}` : "") };
       } catch (err: any) {
         // Sanitize error message to avoid leaking passwords
