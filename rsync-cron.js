@@ -58,6 +58,40 @@ async function reloadTasks() {
           sshCommand += ` -o PasswordAuthentication=yes`;
         }
 
+        const syncDatabaseWithDisk = async () => {
+          if (!fs.existsSync(localPath)) return;
+          const filesOnDisk = fs.readdirSync(localPath).filter(f => fs.statSync(path.join(localPath, f)).isFile());
+          const existingDbFiles = await prisma.file.findMany({ where: { clientId: client.id } });
+          
+          for (const dbFile of existingDbFiles) {
+            const physicalName = path.basename(dbFile.path);
+            if (!filesOnDisk.includes(physicalName)) {
+              await prisma.file.delete({ where: { id: dbFile.id } });
+            }
+          }
+
+          for (const diskFile of filesOnDisk) {
+            const exists = existingDbFiles.find(f => path.basename(f.path) === diskFile);
+            const stats = fs.statSync(path.join(localPath, diskFile));
+            if (!exists) {
+              await prisma.file.create({
+                data: {
+                  name: diskFile,
+                  path: `uploads/${client.slug}/${diskFile}`,
+                  size: stats.size,
+                  mimeType: "application/octet-stream",
+                  clientId: client.id
+                }
+              });
+            } else if (exists.size !== stats.size) {
+              await prisma.file.update({
+                where: { id: exists.id },
+                data: { size: stats.size }
+              });
+            }
+          }
+        };
+
         try {
           if (port === "21") {
             const escapedPassword = sshPassword ? sshPassword.replace(/'/g, "'\\''") : "";
@@ -83,6 +117,17 @@ async function reloadTasks() {
               const cmd = `${rsyncPrefix}rsync -avz --delete -e "${sshCommand}" ${user}@${host}:${remotePath}/ ${localPath}/`;
               execSync(cmd, { encoding: 'utf-8' });
             }
+          }
+          if (mode === "pull" || mode === "both") {
+            // Need an async wrapper to call syncDatabaseWithDisk since cron handler is synchronous
+            (async () => {
+              try {
+                await syncDatabaseWithDisk();
+                console.log(`[RSYNC Cron] [${client.slug}] Database synced successfully.`);
+              } catch (dbErr) {
+                console.error(`[RSYNC Cron] [${client.slug}] Database sync failed:`, dbErr);
+              }
+            })();
           }
           console.log(`[RSYNC Cron] [${client.slug}] Synchronization completed successfully.`);
         } catch (err) {
