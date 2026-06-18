@@ -1,6 +1,7 @@
 const cron = require('node-cron');
 const Database = require('better-sqlite3');
 const fs = require('fs');
+const http = require('http');
 
 const dbPath = process.env.DATABASE_URL ? process.env.DATABASE_URL.replace('file:', '') : '/app/data/dev.db';
 
@@ -12,6 +13,60 @@ function logCron(message) {
   try {
     fs.appendFileSync('/app/data/cron.log', line + '\n');
   } catch (e) {}
+}
+
+// Wait for Next.js to be ready by polling the health endpoint
+function waitForServer(retries = 30, delayMs = 5000) {
+  return new Promise((resolve) => {
+    function attempt(remaining) {
+      const req = http.request(
+        { hostname: '127.0.0.1', port: 3000, path: '/api/auth/me', method: 'GET' },
+        (res) => {
+          // Any HTTP response means the server is up
+          logCron(`[RSYNC Cron] Next.js server is ready (HTTP ${res.statusCode}). Starting scheduler.`);
+          resolve();
+        }
+      );
+      req.on('error', () => {
+        if (remaining <= 0) {
+          logCron(`[RSYNC Cron] WARNING: Server did not respond after all retries. Starting anyway.`);
+          resolve();
+          return;
+        }
+        logCron(`[RSYNC Cron] Waiting for Next.js server... (${remaining} retries left)`);
+        setTimeout(() => attempt(remaining - 1), delayMs);
+      });
+      req.end();
+    }
+    attempt(retries);
+  });
+}
+
+function httpPost(clientId) {
+  return new Promise((resolve) => {
+    const req = http.request({
+      hostname: '127.0.0.1',
+      port: 3000,
+      path: `/api/rsync?clientId=${clientId}&cronSecret=scp-internal-cron-secret-2026`,
+      method: 'POST'
+    }, (res) => {
+      let data = '';
+      res.on('data', chunk => data += chunk);
+      res.on('end', () => {
+        if (res.statusCode >= 200 && res.statusCode < 300) {
+          logCron(`[RSYNC Cron] API triggered successfully. Response: ${data}`);
+        } else {
+          logCron(`[RSYNC Cron] HTTP error! status: ${res.statusCode} - Data: ${data}`);
+        }
+        resolve();
+      });
+    });
+    req.on('error', (err) => {
+      logCron(`[RSYNC Cron] Failed to trigger API: ${err.message}`);
+      resolve();
+    });
+    req.end();
+  });
 }
 
 let activeTasks = {};
@@ -55,30 +110,7 @@ async function reloadTasks() {
 
       const task = cron.schedule(client.rsyncCron, () => {
         logCron(`[RSYNC Cron] Triggering RSYNC via API for client ${client.id}...`);
-        
-        const http = require('http');
-        const req = http.request({
-          hostname: '127.0.0.1',
-          port: 3000,
-          path: `/api/rsync?clientId=${client.id}&cronSecret=scp-internal-cron-secret-2026`,
-          method: 'POST'
-        }, (res) => {
-          let data = '';
-          res.on('data', chunk => data += chunk);
-          res.on('end', () => {
-            if (res.statusCode >= 200 && res.statusCode < 300) {
-              logCron(`[RSYNC Cron] API triggered successfully. Response: ${data}`);
-            } else {
-              logCron(`[RSYNC Cron] HTTP error! status: ${res.statusCode} - Data: ${data}`);
-            }
-          });
-        });
-
-        req.on('error', (err) => {
-          logCron(`[RSYNC Cron] Failed to trigger API: ${err.message}`);
-        });
-
-        req.end();
+        httpPost(client.id);
       });
 
       activeTasks[client.id] = { task, cronStr: client.rsyncCron };
@@ -90,5 +122,7 @@ async function reloadTasks() {
 }
 
 logCron("[RSYNC Cron] Starting background scheduler engine...");
-reloadTasks();
-setInterval(reloadTasks, 60000);
+waitForServer().then(() => {
+  reloadTasks();
+  setInterval(reloadTasks, 60000);
+});
