@@ -1,171 +1,194 @@
-# SCP — Sistema de Compartilhamento de Arquivos
+<div align="center">
 
-Um sistema auto-hospedado (**Self-Hosted**), seguro e de alta performance para gerenciar e compartilhar arquivos com links diretos, projetado especificamente para ser implantado no **Easypanel** com persistência total em banco SQLite.
+# 📦 SCP — Secure Cloud Portal
 
-Ideal para compartilhar arquivos com clientes de forma rápida, segura e elegante.
-Exemplo de acesso:
-- `https://seu-dominio.com/cliente-1` (Acesso ao portal do cliente com todos os seus downloads)
-- `https://seu-dominio.com/cliente-1/documento.pdf` (Download direto e streaming de alta velocidade)
+**Plataforma self-hosted de compartilhamento de arquivos com SFTP, RSYNC e portal web para clientes.**
+
+[![Docker](https://img.shields.io/badge/Docker-Alpine%20Linux-2496ED?style=flat-square&logo=docker)](https://www.docker.com/)
+[![Next.js](https://img.shields.io/badge/Next.js-16-black?style=flat-square&logo=next.js)](https://nextjs.org/)
+[![SQLite](https://img.shields.io/badge/SQLite-Prisma%207-003B57?style=flat-square&logo=sqlite)](https://www.prisma.io/)
+[![License](https://img.shields.io/badge/License-Privado-red?style=flat-square)](#)
+
+</div>
+
+---
+
+## 💡 O que é o SCP?
+
+O **SCP (Secure Cloud Portal)** é uma plataforma **100% self-hosted** para gerenciar e compartilhar arquivos de forma profissional com seus clientes. Cada cliente recebe um **portal exclusivo com URL própria**, protegido por senha, onde pode visualizar e baixar seus arquivos diretamente.
+
+Além do portal web, o SCP oferece um **servidor SFTP integrado** para transferências diretas via terminal ou programas como FileZilla, e um **sistema de sincronização automática (RSYNC/FTP)** que mantém os arquivos sempre atualizados a partir de servidores remotos.
+
+```
+https://seu-dominio.com/nome-do-cliente       → Portal do cliente (web)
+sftp://nome-do-cliente@seu-dominio.com:2222   → Acesso SFTP direto
+```
+
 ---
 
 ## ✨ Funcionalidades
 
-- 🔒 **Painel Administrativo Restrito**: Controle total sobre clientes, arquivos, senhas e parâmetros de sincronização via `/admin`.
-- 👥 **Portais Scoped por Cliente**: Cada cliente possui uma URL única com sua marca e seus arquivos.
-- 🔑 **Proteção por Senha (Portal Web)**: Portais de clientes podem ser protegidos por senha individual para segurança adicional.
-- ⚡ **Servidor OpenSSH/SFTP Integrado**: O container Docker executa um servidor SSH/SFTP seguro em paralelo na porta `22`. Usuários do sistema Linux são criados e gerenciados dinamicamente com base no `slug` de cada cliente para transferências super velozes via CLI ou programas de FTP (como FileZilla, Cyberduck ou WinSCP).
-- 🔄 **Sincronização RSYNC por Cliente**: Configuração granular de sincronização de arquivos para cada cliente com suporte a modos **Push** (envio de arquivos para servidor remoto), **Pull** (recuperação de arquivos do servidor remoto) ou **Both** (ambos).
-- 📅 **Agendador Cron Dinâmico**: Defina cronogramas personalizados (ex: `*/15 * * * *`) individualmente por cliente para sincronizações automáticas periódicas.
-- 🔑 **Reset de Senha Simplificado**: Interface administrativa avançada para redefinir a senha do portal web e a senha SSH de qualquer cliente com apenas um clique.
-- 🔒 **Autenticação Segura com Chave Privada (RSYNC)**: Suporte para chave privada SSH individual por cliente, permitindo sincronização passwordless segura.
-- 📝 **Restauro Automático no Boot (Persistência)**: Durante a inicialização do container, um script reconstrói todas as contas SSH Linux de forma segura a partir dos hashes SHA-512 persistidos no SQLite, garantindo que reinicializações ou upgrades de container não quebrem o acesso SFTP/SCP.
-- 📈 **Logs de RSYNC em Tempo Real**: Visualize o histórico e o output detalhado da última sincronização manual ou agendada diretamente na página administrativa do cliente.
-- 🚀 **Uploader Inteligente**: Suporte a múltiplos uploads por drag & drop com barra de progresso em tempo real.
-- 📂 **Resolução de Conflitos**: Renomeia automaticamente arquivos com o mesmo nome para evitar sobrescritas acidentais (ex: `foto.png` -> `foto (1).png`).
-- 📈 **Contador de Downloads**: Acompanhe o número total de downloads realizados por arquivo em tempo real.
-- 📦 **Downloads de Alta Performance**: Utiliza streaming seguro em pedaços (chunks) evitando sobrecarga de memória RAM no servidor host.
-- 🎨 **Design Moderno Obsidian**: Interface fluida, responsiva e premium com tema escuro, efeito Glassmorphism de ponta e notificações visuais interativas por Toast utilizando `react-hot-toast`.
+| Recurso | Descrição |
+|---|---|
+| 🔒 **Painel Admin** | Controle total sobre clientes, arquivos, senhas e sincronização via `/admin` |
+| 👤 **Portais por Cliente** | Cada cliente tem uma URL exclusiva com seus arquivos isolados |
+| 🔑 **Proteção por Senha** | Portais podem ser individualmente protegidos com senha |
+| ⚡ **Servidor SFTP** | OpenSSH nativo rodando em paralelo — acesso direto com FileZilla, WinSCP, etc. |
+| 🔒 **Chroot Jail** | Cada usuário SFTP é isolado na sua própria pasta, sem acesso ao resto do sistema |
+| 🔄 **Sincronização RSYNC** | Sync de arquivos por cliente com suporte a Push, Pull e Both |
+| 📅 **Agendador CRON** | Cronogramas individuais por cliente (ex: `*/15 * * * *`) |
+| 📊 **SLog — Logs em Tempo Real** | Visualize logs de CRON e RSYNC direto no painel admin |
+| 🔁 **Reconstituição no Boot** | Contas SSH são recriadas automaticamente ao reiniciar o container |
+| 📤 **Upload Drag & Drop** | Upload múltiplo com barra de progresso em tempo real |
+| 📈 **Contador de Downloads** | Acompanhe quantas vezes cada arquivo foi baixado |
+| 📦 **Streaming Seguro** | Downloads em chunks para não sobrecarregar a memória do servidor |
+| 🎨 **Design Obsidian** | Interface premium com Glassmorphism, animações e tema dark |
 
 ---
 
-## 🛠️ Tecnologias Utilizadas
+## 🛠️ Stack Tecnológica
 
-- **Framework**: Next.js 16 (App Router + React Server Components)
-- **Banco de Dados**: SQLite + Prisma 7 (com driver adapter `@prisma/adapter-better-sqlite3` para máxima performance em ambiente standalone)
-- **Estilização**: Vanilla CSS (CSS Variables + Glassmorphism Avançado)
-- **Segurança**: Criptografia de senhas com `bcryptjs`, senhas SSH em hash criptográfico SHA-512 (`chpasswd`) e sessões JWT seguras em cookies `HttpOnly`
-- **Servidor SSH/SFTP**: OpenSSH nativo no Alpine Linux rodando em paralelo no container
-- **Agendamento**: `node-cron` com carregamento dinâmico para execução das sincronizações periódicas de RSYNC
-- **Notificações**: `react-hot-toast` para notificações e alertas visuais premium na interface
-- **Container**: Docker (Node 22 Alpine com ferramentas nativas de compilação C++, `rsync`, `openssh` e `shadow`)
+```
+Framework:     Next.js 16  (App Router + RSC)
+Banco de dados: SQLite + Prisma 7  (adapter better-sqlite3)
+Autenticação:  JWT (HttpOnly Cookie) + bcryptjs
+SSH/SFTP:      OpenSSH nativo no Alpine Linux (Chroot Jail)
+Sincronização: rsync, sshpass, lftp  (via node-cron direto)
+Container:     Docker — Node 22 Alpine
+Notificações:  react-hot-toast
+CSS:           Vanilla CSS  (CSS Variables + Glassmorphism)
+```
 
 ---
 
-## 🚀 Passo a Passo para Subir no Easypanel
+## 🚀 Deploy no Easypanel
 
-O **Easypanel** é um painel de controle incrível que facilita o deploy de aplicações Docker. Siga o passo a passo detalhado abaixo para colocar o seu SCP no ar em minutos:
+### 1. Criar o Serviço
+1. No Easypanel, abra seu projeto e clique em **Create Service → App**
+2. Dê um nome (ex: `scp`) e salve
 
-### 1. Criar um Novo Aplicativo no Easypanel
-1. Acesse o painel do seu **Easypanel**.
-2. Selecione o seu **Projeto**.
-3. Clique no botão **"Create Service"** (Criar Serviço) ou **"App"**.
-4. Selecione a opção **"App"** para criar um novo aplicativo em branco.
-5. Defina um nome fácil de lembrar (ex: `scp` ou `compartilhamento`).
+### 2. Configurar o Repositório
+Na aba **Source**, configure:
+- **Repository URL**: `https://github.com/GuilhermeAzespo/SCP.git`
+- **Branch**: `main`
 
-### 2. Configurar a Origem do Código (GitHub)
-1. Vá até a aba **"Source"** (Origem) nas configurações do seu novo aplicativo.
-2. Em **Repository Type**, selecione **Git Repository**.
-3. No campo **Repository URL**, insira o endereço do seu repositório:
-   ```txt
-   https://github.com/GuilhermeAzespo/SCP.git
-   ```
-4. No campo **Branch**, insira: `main`
-5. Clique em **Save** (Salvar).
+### 3. Volume Persistente ⚠️ (Obrigatório)
+Na aba **Storage**, adicione um volume:
+- **Name**: `scp-data`
+- **Container Path**: `/app/data`
 
-### 3. Configurar o Volume de Persistência (Importante! ⚠️)
-Como o aplicativo usa um banco de dados SQLite (`dev.db`), armazena os uploads locais e as chaves SSH em `/app/data`, você **DEVE** configurar um volume persistente. Caso contrário, seus dados, usuários SSH e arquivos serão apagados sempre que o container reiniciar!
+> Sem esse volume, o banco SQLite, os arquivos e as chaves SSH serão perdidos a cada reinicialização!
 
-1. Acesse a aba **"Storage"** (Armazenamento ou Volumes) no menu do aplicativo no Easypanel.
-2. Clique em **"Add Volume"** (Adicionar Volume).
-3. Preencha as seguintes informações:
-   - **Name**: `scp-data`
-   - **Container Path** (Caminho no Container): `/app/data`
-   - **Host Path** (Caminho no Host): Pode deixar em branco (o Easypanel criará uma pasta segura automaticamente).
-4. Clique em **Save** (Salvar).
+### 4. Portas
+Na aba **Ports**, adicione:
 
-### 4. Configurar Portas para Acesso SFTP/SCP (Opcional 📡)
-Para permitir que seus clientes façam uploads diretos e transferências por SFTP (porta `22` interna):
-1. Acesse a aba **"Ports"** (Portas) nas configurações do aplicativo no Easypanel.
-2. Adicione um novo mapeamento de porta:
-   - **Container Port**: `22`
-   - **Host Port**: `2222` (ou a porta de sua preferência no servidor host, ex: `22` se não estiver em uso).
-3. Clique em **Save** (Salvar).
-4. *Nota: Seus clientes e ferramentas externas poderão se conectar usando a URL do seu servidor na porta configurada (ex: `sftp://slug-do-cliente@seu-servidor.com:2222`).*
+| Container Port | Host Port | Uso |
+|---|---|---|
+| `3000` | `80/443` | Portal web (gerenciado pelo Easypanel) |
+| `22` | `2222` | Acesso SFTP/SSH dos clientes |
 
-### 5. Configurar as Variáveis de Ambiente (Opcional 🔒)
-Se você deseja personalizar o acesso do administrador inicial ou definir uma senha segura padrão, configure as variáveis na aba **"Environment"**:
+### 5. Variáveis de Ambiente
+Na aba **Environment**, configure:
 
-1. Vá até a aba **"Environment"** (Variáveis de Ambiente).
-2. Adicione as seguintes chaves/valores:
-   - `ADMIN_USERNAME`: O nome de usuário para acessar o painel `/admin` (Padrão caso não definido: `admin`).
-   - `ADMIN_PASSWORD`: A senha para acessar o painel `/admin` (Padrão caso não definido: `admin`).
-   - `JWT_SECRET`: Insira uma sequência de caracteres aleatórios seguros (usada para criptografar as sessões).
-3. Clique em **Save** (Salvar).
+```env
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD=sua-senha-segura
+JWT_SECRET=uma-string-aleatoria-longa-aqui
+```
 
-> 💡 **Nota**: O sistema é auto-regenerativo. Na primeira vez que ele iniciar com o banco de dados vazio, ele lerá essas variáveis de ambiente e criará o usuário administrador inicial de forma automática no banco persistente!
+> Na primeira inicialização com banco vazio, o sistema cria o usuário admin automaticamente com base nessas variáveis.
 
-### 6. Realizar o Deploy
-1. Volte para a aba **"General"** (Geral) ou use o menu superior.
-2. Clique no botão **"Deploy"**.
-3. O Easypanel irá:
-   - Clonar o código diretamente do GitHub.
-   - Ler o `Dockerfile` nativo.
-   - Instalar as dependências e compilar a aplicação standalone.
-   - Executar o `entrypoint.sh` para rodar todas as migrações no banco persistente `/app/data/dev.db`.
-   - Iniciar o servidor OpenSSH na porta `22` e o agendador de tarefas RSYNC (`rsync-cron.js`) em segundo plano.
-   - Iniciar o servidor Next.js na porta `3000`.
-
-### 7. Configurar o Domínio / DNS
-1. Na aba **"Domains"** do Easypanel, o painel criará um subdomínio automático com SSL configurado.
-2. Se quiser usar um domínio próprio (ex: `arquivos.suaempresa.com.br`), basta adicioná-lo ali e apontar o DNS tipo `CNAME` no seu provedor de domínios (Cloudflare, GoDaddy, etc.) para o endereço do seu Easypanel.
-
-Pronto! Seu portal de compartilhamento seguro estará no ar e pronto para uso! 🎉
+### 6. Deploy!
+Clique em **Deploy**. O Easypanel irá:
+1. Clonar o repositório e ler o `Dockerfile`
+2. Instalar dependências e compilar o Next.js
+3. Ao iniciar, rodar o `entrypoint.sh` que:
+   - Aplica as migrations do Prisma
+   - Reconstrói todas as contas SSH dos clientes
+   - Inicia o servidor OpenSSH (porta 22)
+   - Inicia o agendador RSYNC em background
+   - Inicia o Next.js (porta 3000)
 
 ---
 
 ## 💻 Desenvolvimento Local
 
-Se você quiser rodar e testar o projeto na sua máquina de desenvolvimento local:
-
 ### Requisitos
-- Node.js 22 ou superior instalado.
-- NPM ou Yarn.
+- Node.js 22+
+- `rsync`, `openssh-client`, `sshpass` instalados no sistema
 
-### Passo a Passo
+### Setup
 
-1. **Clonar o Repositório**:
-   ```bash
-   git clone https://github.com/GuilhermeAzespo/SCP.git
-   cd SCP
-   ```
+```bash
+# 1. Clonar o repositório
+git clone https://github.com/GuilhermeAzespo/SCP.git
+cd SCP
 
-2. **Instalar Dependências**:
-   ```bash
-   npm install
-   ```
+# 2. Instalar dependências
+npm install
 
-3. **Configurar as Variáveis de Ambiente**:
-   Crie um arquivo `.env` na raiz do projeto contendo:
-   ```env
-   DATABASE_URL="file:./data/dev.db"
-   DATA_DIR="./data"
-   ADMIN_USERNAME="admin"
-   ADMIN_PASSWORD="admin"
-   JWT_SECRET="sua-chave-secreta-local"
-   ```
+# 3. Criar o arquivo de ambiente
+cp .env.example .env
+# Edite o .env com suas configurações locais
 
-4. **Gerar o Prisma Client e rodar Migrations**:
-   ```bash
-   npx prisma migrate dev --name init
-   npx prisma generate
-   ```
+# 4. Inicializar o banco de dados
+npx prisma migrate dev --name init
+npx prisma generate
 
-5. **Iniciar o Agendador de Sincronizações RSYNC** (Opcional, para testar background cron):
-   ```bash
-   node rsync-cron.js
-   ```
+# 5. (Opcional) Iniciar o agendador RSYNC em background
+node rsync-cron.js &
 
-6. **Iniciar Servidor de Desenvolvimento**:
-   ```bash
-   npm run dev
-   ```
+# 6. Iniciar o servidor de desenvolvimento
+npm run dev
+```
 
-7. Acesse:
-   - Painel Admin: `http://localhost:3000/admin` (usuário: `admin` / senha: `admin`)
-   - Home: `http://localhost:3000`
+Acesse em: [http://localhost:3000/admin](http://localhost:3000/admin) — usuário `admin` / senha `admin`
+
+### Variáveis de Ambiente (`.env`)
+
+```env
+DATABASE_URL="file:./data/dev.db"
+DATA_DIR="./data"
+ADMIN_USERNAME="admin"
+ADMIN_PASSWORD="admin"
+JWT_SECRET="sua-chave-secreta-local"
+```
+
+---
+
+## 📁 Estrutura do Projeto
+
+```
+SCP/
+├── src/
+│   ├── app/
+│   │   ├── admin/          # Painel administrativo
+│   │   ├── [clientSlug]/   # Portal público por cliente
+│   │   └── api/            # Endpoints da API REST
+│   └── lib/
+│       ├── rsync.ts        # Lógica de sincronização RSYNC/FTP
+│       └── ssh-sync.ts     # Gerenciamento de usuários SSH
+├── prisma/
+│   └── schema.prisma       # Esquema do banco de dados
+├── rsync-cron.js           # Agendador de tarefas background (CRON)
+├── boot-sync.js            # Reconstituição de usuários SSH no boot
+├── entrypoint.sh           # Script de inicialização do container
+├── sshd_config             # Configuração do servidor OpenSSH
+└── Dockerfile              # Imagem Docker de produção
+```
+
+---
+
+## 🔐 Segurança
+
+- Senhas de portal web criptografadas com **bcryptjs**
+- Senhas SSH armazenadas como hashes **SHA-512** e sincronizadas com o sistema via `chpasswd`
+- Sessões gerenciadas com **JWT em cookies HttpOnly** (imunes a XSS)
+- Usuários SFTP isolados em **Chroot Jail** — sem acesso fora da sua pasta
+- Variáveis sensíveis nunca commitadas (`.env` no `.gitignore`)
 
 ---
 
 ## 📄 Licença
 
-Este projeto é de uso restrito e privado. Desenvolvido para implantação rápida e autônoma.
+Uso restrito e privado. Desenvolvido para implantação autônoma em ambientes self-hosted.
