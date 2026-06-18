@@ -4,14 +4,16 @@ import { runRsync, SyncMode } from "@/lib/rsync";
 
 export async function POST(request: Request) {
   try {
-    const session = await getSession();
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     const { searchParams } = new URL(request.url);
+    const cronSecret = searchParams.get("cronSecret");
     const modeOverride = searchParams.get("mode") as SyncMode | null;
     const clientId = searchParams.get("clientId") || undefined;
+
+    const session = await getSession();
+    // Allow either a valid web session OR the internal cron secret
+    if (!session && cronSecret !== "scp-internal-cron-secret-2026") {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
     const results = await runRsync(clientId, modeOverride || undefined);
     

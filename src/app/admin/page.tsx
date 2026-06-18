@@ -575,7 +575,7 @@ export default function AdminDashboard() {
             <div style={{ background: "var(--gradient-accent)", width: "32px", height: "32px", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center" }}>
               <FolderOpen size={16} style={{ color: "white", margin: "auto" }} />
             </div>
-            <h3 style={{ fontSize: "1.125rem" }}>SCP Dashboard</h3>
+            <h3 style={{ fontSize: "1.125rem" }}>SCP</h3>
           </div>
           <div style={{ display: "flex", gap: "8px" }}>
             <button 
@@ -585,22 +585,6 @@ export default function AdminDashboard() {
               style={{ padding: "8px", borderRadius: "8px" }}
             >
               <BookOpen size={16} />
-            </button>
-            <button 
-              onClick={handleDeploy}
-              disabled={isDeploying}
-              className="btn btn-secondary" 
-              title={isDeploying ? "Iniciando deploy..." : "Atualizar sistema (Deploy)"}
-              style={{ 
-                padding: "8px", 
-                borderRadius: "8px",
-                background: isDeploying ? undefined : "rgba(234, 179, 8, 0.1)",
-                borderColor: isDeploying ? undefined : "rgba(234, 179, 8, 0.3)",
-                opacity: isDeploying ? 0.6 : 1,
-                cursor: isDeploying ? "not-allowed" : "pointer"
-              }}
-            >
-              <CloudUpload size={16} className={isDeploying ? "animate-spin" : ""} style={{ color: isDeploying ? undefined : "#eab308" }} />
             </button>
             <button 
               onClick={handleLogout}
