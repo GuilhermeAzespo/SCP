@@ -18,7 +18,7 @@ export async function GET() {
     const rsyncLog = getLog('/app/data/rsync.log');
     
     // Also check chroot directory permissions to debug
-    let perms = [];
+    let perms: string[] = [];
     try {
       perms = execSync('ls -ld / /app /app/data /app/data/uploads /app/data/uploads/* 2>/dev/null', { encoding: 'utf-8' }).split('\n');
     } catch(e) {}
