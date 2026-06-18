@@ -106,6 +106,19 @@ export default function AdminDashboard() {
     rsyncSshPassword: ""
   });
   
+  const [isLogModalOpen, setIsLogModalOpen] = useState(false);
+  const [systemLogs, setSystemLogs] = useState<{cron: string[], rsync: string[]} | null>(null);
+  
+  const fetchLogs = async () => {
+    try {
+      const res = await fetch("/api/debug");
+      if (res.ok) {
+        const data = await res.json();
+        setSystemLogs({ cron: data.cron, rsync: data.rsync });
+      }
+    } catch (err) {}
+  };
+  
   // Drag & drop file ref
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -558,6 +571,59 @@ export default function AdminDashboard() {
         </div>
       )}
 
+      {/* SYSTEM LOG MODAL */}
+      {isLogModalOpen && (
+        <div style={{
+          position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+          background: "rgba(0,0,0,0.8)", zIndex: 9999,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          backdropFilter: "blur(4px)", padding: "2rem"
+        }}>
+          <div className="glass-panel animate-fade-in" style={{
+            width: "100%", maxWidth: "800px", maxHeight: "90vh", padding: "1.5rem",
+            display: "flex", flexDirection: "column", gap: "1rem",
+            boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.5)"
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <h3 style={{ fontSize: "1.25rem", fontWeight: 600, display: "flex", alignItems: "center", gap: "10px" }}>
+                <Terminal size={20} /> Logs do Sistema (SLog)
+              </h3>
+              <div style={{ display: "flex", gap: "8px" }}>
+                <button onClick={fetchLogs} className="btn btn-secondary" style={{ padding: "6px 10px" }} title="Atualizar Logs">
+                  <RefreshCw size={14} />
+                </button>
+                <button onClick={() => setIsLogModalOpen(false)} className="btn btn-secondary" style={{ padding: "6px 10px" }}>
+                  Fechar
+                </button>
+              </div>
+            </div>
+            
+            <div style={{ display: "flex", flexDirection: "column", gap: "1rem", flex: 1, overflowY: "auto" }}>
+              <div>
+                <h4 style={{ fontSize: "0.875rem", color: "var(--accent-primary)", marginBottom: "0.5rem" }}>cron.log (Gatilhos do Agendamento)</h4>
+                <div style={{ background: "rgba(0,0,0,0.4)", borderRadius: "8px", padding: "1rem", border: "1px solid var(--glass-border)", height: "200px", overflowY: "auto" }}>
+                  {systemLogs?.cron ? (
+                    <pre style={{ margin: 0, fontSize: "0.75rem", color: "var(--text-secondary)", whiteSpace: "pre-wrap", wordBreak: "break-all" }}>
+                      {systemLogs.cron.join('\n')}
+                    </pre>
+                  ) : <span className="spinner" style={{ width: "20px", height: "20px", color: "var(--accent-primary)" }} />}
+                </div>
+              </div>
+              <div>
+                <h4 style={{ fontSize: "0.875rem", color: "var(--accent-warning)", marginBottom: "0.5rem" }}>rsync.log (Última Execução de Sincronização)</h4>
+                <div style={{ background: "rgba(0,0,0,0.4)", borderRadius: "8px", padding: "1rem", border: "1px solid var(--glass-border)", height: "200px", overflowY: "auto" }}>
+                  {systemLogs?.rsync ? (
+                    <pre style={{ margin: 0, fontSize: "0.75rem", color: "var(--text-secondary)", whiteSpace: "pre-wrap", wordBreak: "break-all" }}>
+                      {systemLogs.rsync.join('\n')}
+                    </pre>
+                  ) : <span className="spinner" style={{ width: "20px", height: "20px", color: "var(--accent-primary)" }} />}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* SIDEBAR - CLIENT LIST */}
       <aside className="glass-panel" style={{
         width: "340px",
@@ -910,7 +976,7 @@ export default function AdminDashboard() {
                     style={{ padding: "10px 14px", fontSize: "0.8125rem", background: selectedClient.rsyncEnabled ? "rgba(99, 102, 241, 0.1)" : undefined }}
                   >
                     <RefreshCw size={16} style={{ color: selectedClient.rsyncEnabled ? "var(--accent-primary)" : undefined }} />
-                    <span>RSYNC</span>
+                    <span>Sincronização</span>
                   </button>
                   <button 
                     onClick={() => setIsResettingPassword(true)}
@@ -996,16 +1062,24 @@ export default function AdminDashboard() {
                       <RefreshCw size={18} style={{ color: "var(--accent-primary)" }} /> Configuração de RSYNC
                     </h3>
                     <div style={{ display: "flex", gap: "10px" }}>
-                      <button 
-                        onClick={handleRsyncSync}
-                        className="btn btn-secondary" 
-                        title="Sincronizar Arquivos Agora"
-                        disabled={isSyncingRsync || !rsyncForm.rsyncEnabled}
-                        style={{ padding: "8px 12px", borderRadius: "8px", opacity: isSyncingRsync || !rsyncForm.rsyncEnabled ? 0.5 : 1, cursor: isSyncingRsync || !rsyncForm.rsyncEnabled ? "not-allowed" : "pointer", fontSize: "0.8125rem" }}
-                      >
-                        <RefreshCw size={14} className={isSyncingRsync ? "animate-spin" : ""} /> Sincronizar Agora
-                      </button>
-                    </div>
+                        <button 
+                          onClick={(e) => { e.preventDefault(); setIsLogModalOpen(true); fetchLogs(); }}
+                          className="btn btn-secondary" 
+                          title="Ver Logs do Sistema"
+                          style={{ padding: "8px 12px", borderRadius: "8px", fontSize: "0.8125rem" }}
+                        >
+                          <Terminal size={14} /> Ver Logs
+                        </button>
+                        <button 
+                          onClick={handleRsyncSync}
+                          className="btn btn-secondary" 
+                          title="Sincronizar Arquivos Agora"
+                          disabled={isSyncingRsync || !rsyncForm.rsyncEnabled}
+                          style={{ padding: "8px 12px", borderRadius: "8px", opacity: isSyncingRsync || !rsyncForm.rsyncEnabled ? 0.5 : 1, cursor: isSyncingRsync || !rsyncForm.rsyncEnabled ? "not-allowed" : "pointer", fontSize: "0.8125rem" }}
+                        >
+                          <RefreshCw size={14} className={isSyncingRsync ? "animate-spin" : ""} /> Sincronizar Agora
+                        </button>
+                      </div>
                   </div>
 
                   {/* Sync result log panel */}

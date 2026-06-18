@@ -165,5 +165,22 @@ export async function runRsync(clientId?: string, modeOverride?: SyncMode): Prom
     }
   }
 
+  // Write results to log file
+  try {
+    const timestamp = new Date().toISOString();
+    let logOutput = "";
+    for (const res of results) {
+      logOutput += `[${timestamp}] [Client: ${res.clientSlug}] [Mode: ${res.mode}] Success: ${res.success}\n`;
+      if (res.error) logOutput += `[${timestamp}] Error: ${res.error}\n`;
+      if (res.logs) {
+        const cleanLogs = res.logs.split('\n').filter(Boolean).map(l => `[${timestamp}] > ${l}`).join('\n');
+        logOutput += `${cleanLogs}\n`;
+      }
+    }
+    if (logOutput) {
+      fs.appendFileSync("/app/data/rsync.log", logOutput);
+    }
+  } catch (e) {}
+
   return results;
 }

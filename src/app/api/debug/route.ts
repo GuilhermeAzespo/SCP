@@ -4,20 +4,31 @@ import { execSync } from 'child_process';
 
 export async function GET() {
   try {
-    let log = '';
-    if (fs.existsSync('/app/data/sshd.log')) {
-      log = execSync('tail -n 100 /app/data/sshd.log', { encoding: 'utf-8' });
-    } else {
-      log = 'No sshd.log found';
-    }
+    const getLog = (path: string) => {
+      try {
+        if (fs.existsSync(path)) {
+          return execSync(`tail -n 100 ${path}`, { encoding: 'utf-8' }).split('\n');
+        }
+      } catch (e) {}
+      return ['Arquivo não encontrado ou vazio.'];
+    };
+
+    const sshdLog = getLog('/app/data/sshd.log');
+    const cronLog = getLog('/app/data/cron.log');
+    const rsyncLog = getLog('/app/data/rsync.log');
     
     // Also check chroot directory permissions to debug
-    let perms = '';
+    let perms = [];
     try {
-      perms = execSync('ls -ld / /app /app/data /app/data/uploads /app/data/uploads/* 2>/dev/null', { encoding: 'utf-8' });
+      perms = execSync('ls -ld / /app /app/data /app/data/uploads /app/data/uploads/* 2>/dev/null', { encoding: 'utf-8' }).split('\n');
     } catch(e) {}
 
-    return NextResponse.json({ log: log.split('\n'), perms: perms.split('\n') });
+    return NextResponse.json({ 
+      sshd: sshdLog, 
+      cron: cronLog, 
+      rsync: rsyncLog,
+      perms 
+    });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
