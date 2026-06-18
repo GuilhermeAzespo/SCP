@@ -45,3 +45,5 @@ next-env.d.ts
 # local data storage (sqlite database & uploaded files)
 /data
 
+antigravity_memories.zip
+antigravity_memories/

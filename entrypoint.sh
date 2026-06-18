@@ -17,6 +17,9 @@ sqlite3 /app/data/dev.db "ALTER TABLE Client ADD COLUMN rsyncSshPassword TEXT;" 
 # Safety: ensure rsyncSshPort column exists (handles upgrades from older installs)
 sqlite3 /app/data/dev.db "ALTER TABLE Client ADD COLUMN rsyncSshPort TEXT;" 2>/dev/null || true
 
+# Safety: ensure rsyncProtocol column exists (handles upgrades from older installs)
+sqlite3 /app/data/dev.db "ALTER TABLE Client ADD COLUMN rsyncProtocol TEXT DEFAULT 'rsync';" 2>/dev/null || true
+
 echo "Starting OpenSSH daemon for SCP server..."
 # Generate host keys if they don't exist
 ssh-keygen -A
