@@ -71,6 +71,7 @@ export async function PATCH(
       password,
       rsyncEnabled,
       rsyncMode,
+      rsyncProtocol,
       rsyncCron,
       rsyncHost,
       rsyncSshPort,
@@ -109,6 +110,7 @@ export async function PATCH(
     // Update RSYNC settings if provided
     if (rsyncEnabled !== undefined) updateData.rsyncEnabled = rsyncEnabled;
     if (rsyncMode !== undefined) updateData.rsyncMode = rsyncMode;
+    if (rsyncProtocol !== undefined) updateData.rsyncProtocol = rsyncProtocol;
     if (rsyncCron !== undefined) updateData.rsyncCron = rsyncCron;
     if (rsyncHost !== undefined) updateData.rsyncHost = rsyncHost;
     if (rsyncSshPort !== undefined) updateData.rsyncSshPort = rsyncSshPort;

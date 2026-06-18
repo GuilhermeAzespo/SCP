@@ -40,8 +40,8 @@ export async function runRsync(clientId?: string, modeOverride?: SyncMode): Prom
     const mode: SyncMode = modeOverride || (client.rsyncMode as SyncMode) || "push";
     const clientSlug = client.slug;
     
-    // Each client's data is isolated in /uploads/<slug>
-    const localPath = path.join(localDataDir, "uploads", clientSlug);
+    // Each client's data is isolated in /uploads/<slug>/files
+    const localPath = path.join(localDataDir, "uploads", clientSlug, "files");
 
     if (!host || !user || !remotePath) {
       results.push({ clientId: client.id, clientSlug, mode, success: false, error: "Missing required RSYNC database configuration (Host, User, Path)", logs: "" });
@@ -72,14 +72,30 @@ export async function runRsync(clientId?: string, modeOverride?: SyncMode): Prom
 
     const executeSync = async (currentMode: "push" | "pull"): Promise<SyncResult> => {
       try {
-        let rsyncCmd = "";
-        if (currentMode === "push") {
-          rsyncCmd = `${rsyncPrefix}rsync -avz --delete -e "${sshCommand}" ${localPath}/ ${user}@${host}:${remotePath}/`;
+        let syncCmd = "";
+        const protocol = client.rsyncProtocol || "rsync";
+
+        if (protocol === "scp") {
+          // SCP Command
+          let scpBase = `scp -P ${port} -o StrictHostKeyChecking=no`;
+          if (sshKey) scpBase += ` -i ${keyPath} -o PasswordAuthentication=no`;
+          else if (sshPassword) scpBase += ` -o PasswordAuthentication=yes`;
+
+          if (currentMode === "push") {
+            syncCmd = `${rsyncPrefix}${scpBase} -r ${localPath}/* ${user}@${host}:${remotePath}/`;
+          } else {
+            syncCmd = `${rsyncPrefix}${scpBase} -r ${user}@${host}:${remotePath}/* ${localPath}/`;
+          }
         } else {
-          rsyncCmd = `${rsyncPrefix}rsync -avz --delete -e "${sshCommand}" ${user}@${host}:${remotePath}/ ${localPath}/`;
+          // RSYNC Command
+          if (currentMode === "push") {
+            syncCmd = `${rsyncPrefix}rsync -avz --delete -e "${sshCommand}" ${localPath}/ ${user}@${host}:${remotePath}/`;
+          } else {
+            syncCmd = `${rsyncPrefix}rsync -avz --delete -e "${sshCommand}" ${user}@${host}:${remotePath}/ ${localPath}/`;
+          }
         }
 
-        const { stdout, stderr } = await execAsync(rsyncCmd);
+        const { stdout, stderr } = await execAsync(syncCmd);
         return { clientId: client.id, clientSlug, mode: currentMode, success: true, logs: stdout + (stderr ? `\nErrors:\n${stderr}` : "") };
       } catch (err: any) {
         // Sanitize error message to avoid leaking passwords

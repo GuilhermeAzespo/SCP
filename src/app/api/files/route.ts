@@ -89,7 +89,7 @@ export async function POST(request: Request) {
 
     // 2. Prepare physical directories
     const dataDir = process.env.DATA_DIR || "./data";
-    const clientUploadDir = path.resolve(process.cwd(), dataDir, "uploads", client.slug);
+    const clientUploadDir = path.resolve(process.cwd(), dataDir, "uploads", client.slug, "files");
     
     if (!fs.existsSync(clientUploadDir)) {
       fs.mkdirSync(clientUploadDir, { recursive: true });
@@ -105,8 +105,8 @@ export async function POST(request: Request) {
     const buffer = Buffer.from(bytes);
     fs.writeFileSync(physicalPath, buffer);
 
-    // Save relative physical path in database (relative to DATA_DIR/uploads)
-    const dbPath = path.join("uploads", client.slug, safePhysicalName);
+    // Save relative physical path in database (relative to DATA_DIR)
+    const dbPath = path.join("uploads", client.slug, "files", safePhysicalName);
 
     // 5. Save in SQLite DB
     const dbFile = await db.file.create({

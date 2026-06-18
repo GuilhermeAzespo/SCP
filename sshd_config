@@ -26,3 +26,8 @@ Subsystem sftp internal-sftp
 
 # Optional: You can enforce stricter restrictions globally, but since 
 # clients have /bin/sh but no write access outside their homes, it's fairly safe.
+
+Match Group client
+    ChrootDirectory /app/data/uploads/%u
+    X11Forwarding no
+    AllowTcpForwarding no

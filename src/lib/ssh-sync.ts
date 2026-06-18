@@ -23,12 +23,19 @@ export function syncSshUser(
       fs.mkdirSync(homeDir, { recursive: true });
     }
 
+    // Ensure group client exists
+    const groupFile = fs.readFileSync("/etc/group", "utf-8");
+    if (!groupFile.includes("client:")) {
+      execSync(`addgroup client`);
+      console.log(`[SSH Sync] Created client group`);
+    }
+
     // Create Linux user if it doesn't exist
     const passwdFile = fs.readFileSync("/etc/passwd", "utf-8");
     const userExists = passwdFile.split("\n").some(line => line.startsWith(`${slug}:`));
 
     if (!userExists) {
-      execSync(`adduser -D -h ${homeDir} -s /bin/sh ${slug}`);
+      execSync(`adduser -D -G client -h / -s /bin/sh ${slug}`);
       console.log(`[SSH Sync] Created Linux user: ${slug}`);
     }
 
@@ -49,8 +56,8 @@ export function syncSshUser(
       if (shadowLine) {
         const generatedHash = shadowLine.split(":")[1];
         console.log(`[SSH Sync] Captured hash for DB persistence: ${slug}`);
-        execSync(`chown -R root:${slug} ${homeDir}`); // root owns it, user group can access
-        execSync(`chmod 750 ${homeDir}`); // 750 means group (user) gets r-x (read/execute) but no write
+        
+        setupChrootEnv(slug, homeDir);
         return generatedHash; // Return for storage in DB
       }
 
@@ -68,19 +75,77 @@ export function syncSshUser(
       fs.writeFileSync("/etc/shadow", newShadow);
       execSync("chmod 640 /etc/shadow");
       console.log(`[SSH Sync] Restored SHA-512 hash from DB for: ${slug}`);
+      
+      setupChrootEnv(slug, homeDir);
     } else {
       // No password: lock the account
       execSync(`passwd -l ${slug}`);
       console.log(`[SSH Sync] No password for ${slug}, account locked.`);
+      setupChrootEnv(slug, homeDir);
     }
-
-    execSync(`chown -R root:${slug} ${homeDir}`);
-    execSync(`chmod 750 ${homeDir}`);
   } catch (error) {
     console.error(`[SSH Sync] Error syncing user ${slug}:`, error);
   }
 
   return null;
+}
+
+function setupChrootEnv(slug: string, homeDir: string) {
+  try {
+    // 1. Root must own the chroot directory for ChrootDirectory to work
+    execSync(`chown root:root ${homeDir}`);
+    execSync(`chmod 755 ${homeDir}`);
+
+    // 2. Create the writable "files" directory for the user
+    const filesDir = `${homeDir}/files`;
+    if (!fs.existsSync(filesDir)) fs.mkdirSync(filesDir);
+    execSync(`chown ${slug}:client ${filesDir}`);
+    execSync(`chmod 770 ${filesDir}`);
+
+    // 3. Build minimal chroot environment (binaries and libs)
+    const dirs = ['bin', 'usr/bin', 'lib', 'usr/lib', 'etc'];
+    for (const d of dirs) {
+      if (!fs.existsSync(`${homeDir}/${d}`)) {
+        fs.mkdirSync(`${homeDir}/${d}`, { recursive: true });
+      }
+    }
+
+    // Copy binaries
+    const binaries = ['/bin/sh', '/usr/bin/scp', '/usr/bin/rsync'];
+    for (const bin of binaries) {
+      if (fs.existsSync(bin)) {
+        fs.copyFileSync(bin, `${homeDir}${bin}`);
+        execSync(`chmod +x ${homeDir}${bin}`);
+        
+        // Find and copy dependencies using ldd (Alpine uses musl libc)
+        try {
+          const lddOut = execSync(`ldd ${bin} 2>/dev/null || true`, { encoding: 'utf-8' });
+          const lines = lddOut.split('\n');
+          for (const line of lines) {
+            const match = line.match(/=>\s+(.*?)\s+\(/) || line.match(/^\s+(.*?)\s+\(/) || line.match(/([/\w.-]+\.so[\d.]*)/);
+            if (match && match[1]) {
+              const lib = match[1].trim();
+              if (lib && fs.existsSync(lib) && !lib.startsWith('linux-vdso')) {
+                const libDest = `${homeDir}${lib}`;
+                if (!fs.existsSync(libDest)) {
+                  fs.mkdirSync(libDest.substring(0, libDest.lastIndexOf('/')), { recursive: true });
+                  fs.copyFileSync(lib, libDest);
+                }
+              }
+            }
+          }
+        } catch (e) {}
+      }
+    }
+
+    // 4. Create fake /etc/passwd inside chroot so `ls -l` shows correct username
+    const passwdContent = `root:x:0:0:root:/root:/bin/sh\n${slug}:x:1000:1000:,,,:/files:/bin/sh\n`;
+    fs.writeFileSync(`${homeDir}/etc/passwd`, passwdContent);
+    execSync(`chmod 644 ${homeDir}/etc/passwd`);
+
+  } catch (err: any) {
+    console.error(`[SSH Sync] Error setting up chroot env for ${slug}:`, err.message);
+  }
 }
 
 /**

@@ -19,6 +19,7 @@ interface Client {
   createdAt: string;
   rsyncEnabled: boolean;
   rsyncMode: string;
+  rsyncProtocol: string;
   rsyncCron: string | null;
   rsyncHost: string | null;
   rsyncSshPort: string | null;
@@ -72,6 +73,7 @@ export default function AdminDashboard() {
   const [rsyncForm, setRsyncForm] = useState({
     rsyncEnabled: false,
     rsyncMode: "push",
+    rsyncProtocol: "rsync",
     rsyncCron: "",
     rsyncHost: "",
     rsyncSshPort: "",
@@ -137,6 +139,7 @@ export default function AdminDashboard() {
     setRsyncForm({
       rsyncEnabled: selectedClient.rsyncEnabled || false,
       rsyncMode: selectedClient.rsyncMode || "push",
+      rsyncProtocol: selectedClient.rsyncProtocol || "rsync",
       rsyncCron: selectedClient.rsyncCron || "",
       rsyncHost: selectedClient.rsyncHost || "",
       rsyncSshPort: selectedClient.rsyncSshPort || "",
@@ -873,6 +876,18 @@ export default function AdminDashboard() {
                             <option value="push">Enviar (Push / Espelhar Local no Remoto)</option>
                             <option value="pull">Receber (Pull / Baixar do Remoto para Local)</option>
                             <option value="both">Ambos (Push e Pull)</option>
+                          </select>
+                        </div>
+                        <div className="form-group">
+                          <label className="form-label" style={{ fontSize: "0.75rem" }}>Protocolo de Transferência</label>
+                          <select 
+                            className="form-input" 
+                            value={rsyncForm.rsyncProtocol} 
+                            onChange={(e) => setRsyncForm({...rsyncForm, rsyncProtocol: e.target.value})}
+                            style={{ padding: "8px 12px", fontSize: "0.875rem" }}
+                          >
+                            <option value="rsync">Rsync (Recomendado / Diferencial)</option>
+                            <option value="scp">SCP (Cópia Completa / Equipamentos Legados)</option>
                           </select>
                         </div>
                         <div className="form-group">
