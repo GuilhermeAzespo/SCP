@@ -55,12 +55,13 @@ function syncDatabaseWithDisk(db, clientId, slug, localPath) {
       const stats = fs.statSync(path.join(localPath, diskFile));
       const existing = dbFileMap.get(diskFile);
       if (!existing) {
-        db.prepare(`INSERT INTO File (id, name, path, size, mimeType, clientId, createdAt, updatedAt)
-          VALUES (lower(hex(randomblob(16))), ?, ?, ?, 'application/octet-stream', ?, datetime('now'), datetime('now'))`)
-          .run(diskFile, `uploads/${slug}/files/${diskFile}`, stats.size, clientId);
+        db.prepare(
+          `INSERT INTO File (id, name, path, size, mimeType, downloadCount, createdAt, clientId)
+           VALUES (lower(hex(randomblob(16))), ?, ?, ?, 'application/octet-stream', 0, datetime('now'), ?)`
+        ).run(diskFile, `uploads/${slug}/files/${diskFile}`, stats.size, clientId);
         logCron(`[DB Sync: ${slug}] Added new file: ${diskFile}`);
       } else if (existing.size !== stats.size) {
-        db.prepare('UPDATE File SET size = ?, updatedAt = datetime(\'now\') WHERE id = ?').run(stats.size, existing.id);
+        db.prepare('UPDATE File SET size = ? WHERE id = ?').run(stats.size, existing.id);
         logCron(`[DB Sync: ${slug}] Updated size for: ${diskFile}`);
       }
     }
