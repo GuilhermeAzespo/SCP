@@ -58,7 +58,7 @@ export async function runRsync(clientId?: string, modeOverride?: SyncMode): Prom
     let rsyncPrefix = "";
     const keyPath = `/tmp/rsync_id_rsa_${client.id}`;
 
-    if (sshKey) {
+    if (sshKey && sshKey.trim() !== "") {
       // Priority 1: RSA private key (most secure)
       fs.writeFileSync(keyPath, sshKey.replace(/\\n/g, "\n"), { encoding: "utf-8", mode: 0o600 });
       sshCommand += ` -i ${keyPath} -o PasswordAuthentication=no`;
@@ -70,28 +70,75 @@ export async function runRsync(clientId?: string, modeOverride?: SyncMode): Prom
       sshCommand += ` -o PasswordAuthentication=yes`;
     }
 
+    const syncDatabaseWithDisk = async () => {
+      if (!fs.existsSync(localPath)) return;
+      const filesOnDisk = fs.readdirSync(localPath).filter(f => fs.statSync(path.join(localPath, f)).isFile());
+      const existingDbFiles = await db.file.findMany({ where: { clientId: client.id } });
+      
+      for (const dbFile of existingDbFiles) {
+        const physicalName = path.basename(dbFile.path);
+        if (!filesOnDisk.includes(physicalName)) {
+          await db.file.delete({ where: { id: dbFile.id } });
+        }
+      }
+
+      for (const diskFile of filesOnDisk) {
+        const exists = existingDbFiles.find(f => path.basename(f.path) === diskFile);
+        const stats = fs.statSync(path.join(localPath, diskFile));
+        if (!exists) {
+          await db.file.create({
+            data: {
+              name: diskFile,
+              path: `uploads/${clientSlug}/${diskFile}`,
+              size: stats.size,
+              mimeType: "application/octet-stream",
+              clientId: client.id
+            }
+          });
+        } else if (exists.size !== stats.size) {
+          await db.file.update({
+            where: { id: exists.id },
+            data: { size: stats.size }
+          });
+        }
+      }
+    };
+
     const executeSync = async (currentMode: "push" | "pull"): Promise<SyncResult> => {
       try {
         let syncCmd = "";
         const protocol = client.rsyncProtocol || "rsync";
 
-        if (protocol === "scp") {
+        if (port === "21") {
+          // FTP mode via lftp
+          const escapedPassword = sshPassword ? sshPassword.replace(/'/g, "'\\''") : "";
+          const auth = `-u '${user}','${escapedPassword}'`;
+          const rPath = remotePath.endsWith('/') ? remotePath : remotePath + '/';
+          
+          if (currentMode === "push") {
+            syncCmd = `lftp -c "set ssl:verify-certificate no; open -u '${user}','${escapedPassword}' -p ${port} ftp://${host}; mirror -R --delete --verbose '${localPath}/' '${rPath}'"`;
+          } else {
+            syncCmd = `lftp -c "set ssl:verify-certificate no; open -u '${user}','${escapedPassword}' -p ${port} ftp://${host}; mirror --delete --verbose '${rPath}' '${localPath}/'"`;
+          }
+        } else if (protocol === "scp") {
           // SCP Command
           let scpBase = `scp -P ${port} -o StrictHostKeyChecking=no`;
           if (sshKey) scpBase += ` -i ${keyPath} -o PasswordAuthentication=no`;
           else if (sshPassword) scpBase += ` -o PasswordAuthentication=yes`;
 
+          const rPath = remotePath.endsWith('/') ? remotePath : remotePath + '/';
           if (currentMode === "push") {
-            syncCmd = `${rsyncPrefix}${scpBase} -r ${localPath}/* ${user}@${host}:${remotePath}/`;
+            syncCmd = `${rsyncPrefix}${scpBase} -r ${localPath}/* ${user}@${host}:${rPath}`;
           } else {
-            syncCmd = `${rsyncPrefix}${scpBase} -r ${user}@${host}:${remotePath}/* ${localPath}/`;
+            syncCmd = `${rsyncPrefix}${scpBase} -r ${user}@${host}:${rPath}* ${localPath}/`;
           }
         } else {
-          // RSYNC Command
+          // SSH/RSYNC mode
+          const rPath = remotePath.endsWith('/') ? remotePath : remotePath + '/';
           if (currentMode === "push") {
-            syncCmd = `${rsyncPrefix}rsync -avz --delete -e "${sshCommand}" ${localPath}/ ${user}@${host}:${remotePath}/`;
+            syncCmd = `${rsyncPrefix}rsync -avz --delete -e "${sshCommand}" ${localPath}/ ${user}@${host}:${rPath}`;
           } else {
-            syncCmd = `${rsyncPrefix}rsync -avz --delete -e "${sshCommand}" ${user}@${host}:${remotePath}/ ${localPath}/`;
+            syncCmd = `${rsyncPrefix}rsync -avz --delete -e "${sshCommand}" ${user}@${host}:${rPath} ${localPath}/`;
           }
         }
 
@@ -110,6 +157,7 @@ export async function runRsync(clientId?: string, modeOverride?: SyncMode): Prom
     
     if (mode === "pull" || mode === "both") {
       results.push(await executeSync("pull"));
+      await syncDatabaseWithDisk();
     }
 
     if (fs.existsSync(keyPath)) {
