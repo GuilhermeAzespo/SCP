@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { 
   FolderPlus, FolderOpen, FileText, Upload, Copy, 
   Trash2, LogOut, Key, Globe, Search, Plus, 
-  Check, ShieldAlert, ArrowLeft, ArrowUpRight, RefreshCw, CloudUpload
+  Check, ShieldAlert, ArrowLeft, ArrowUpRight, RefreshCw, CloudUpload,
+  BookOpen, Terminal, Clock, Settings, Info
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 
@@ -49,6 +50,7 @@ export default function AdminDashboard() {
   // App data state
   const [clients, setClients] = useState<Client[]>([]);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
+  const [showTutorial, setShowTutorial] = useState(false);
   const [files, setFiles] = useState<FileItem[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   
@@ -577,6 +579,14 @@ export default function AdminDashboard() {
           </div>
           <div style={{ display: "flex", gap: "8px" }}>
             <button 
+              onClick={() => { setSelectedClient(null); setShowTutorial(true); }}
+              className="btn btn-secondary" 
+              title="Tutorial do Sistema"
+              style={{ padding: "8px", borderRadius: "8px" }}
+            >
+              <BookOpen size={16} />
+            </button>
+            <button 
               onClick={handleDeploy}
               disabled={isDeploying}
               className="btn btn-secondary" 
@@ -702,7 +712,7 @@ export default function AdminDashboard() {
               return (
                 <div
                   key={client.id}
-                  onClick={() => setSelectedClient(client)}
+                  onClick={() => { setSelectedClient(client); setShowTutorial(false); }}
                   className="glass-panel"
                   style={{
                     padding: "1rem",
@@ -741,7 +751,121 @@ export default function AdminDashboard() {
 
       {/* MAIN LAYOUT - SELECTION CONTENT */}
       <main style={{ flex: 1, display: "flex", flexDirection: "column", overflowY: "auto" }}>
-        {!selectedClient ? (
+        {showTutorial ? (
+          <div style={{ padding: "3rem", maxWidth: "900px", margin: "0 auto", width: "100%", display: "flex", flexDirection: "column", gap: "2.5rem", animation: "fadeIn 0.3s ease" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "16px", borderBottom: "1px solid var(--glass-border)", paddingBottom: "1.5rem" }}>
+              <div style={{ background: "var(--gradient-primary)", padding: "12px", borderRadius: "12px", boxShadow: "0 4px 20px rgba(99, 102, 241, 0.3)" }}>
+                <BookOpen size={28} style={{ color: "white" }} />
+              </div>
+              <div>
+                <h1 style={{ fontSize: "2rem", margin: 0, fontWeight: 700 }}>Tutorial do Sistema</h1>
+                <p style={{ color: "var(--text-secondary)", margin: "4px 0 0 0", fontSize: "0.9375rem" }}>Guia completo de uso: SFTP, RSYNC e Agendamentos</p>
+              </div>
+            </div>
+
+            <div className="glass-panel" style={{ padding: "2rem", display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "10px", color: "var(--accent-primary)" }}>
+                <Terminal size={22} />
+                <h2 style={{ fontSize: "1.25rem", margin: 0, fontWeight: 600 }}>1. Como acessar via SFTP / FileZilla</h2>
+              </div>
+              <p style={{ color: "var(--text-secondary)", lineHeight: 1.6, margin: 0, fontSize: "0.9375rem" }}>
+                O sistema permite que seus clientes se conectem diretamente à pasta deles usando um cliente de FTP moderno (como o <strong>FileZilla</strong> ou WinSCP) utilizando o protocolo seguro <strong>SFTP</strong>.
+              </p>
+              <div style={{ background: "rgba(0,0,0,0.2)", padding: "1.5rem", borderRadius: "8px", border: "1px solid var(--glass-border)" }}>
+                <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: "12px", color: "var(--text-primary)", fontSize: "0.9375rem" }}>
+                  <li style={{ display: "flex" }}><strong style={{ color: "var(--text-muted)", width: "120px", flexShrink: 0 }}>Host / Link:</strong> <code style={{ color: "var(--accent-success)", background: "rgba(34, 197, 94, 0.1)", padding: "2px 6px", borderRadius: "4px" }}>sftp://scp.uctechnology.com.br</code></li>
+                  <li style={{ display: "flex" }}><strong style={{ color: "var(--text-muted)", width: "120px", flexShrink: 0 }}>Porta:</strong> <code style={{ background: "rgba(255, 255, 255, 0.05)", padding: "2px 6px", borderRadius: "4px" }}>2222</code></li>
+                  <li style={{ display: "flex" }}><strong style={{ color: "var(--text-muted)", width: "120px", flexShrink: 0 }}>Usuário:</strong> <span>O "Slug" do cliente (ex: <code style={{ background: "rgba(255, 255, 255, 0.05)", padding: "2px 6px", borderRadius: "4px" }}>uctechdemo</code>)</span></li>
+                  <li style={{ display: "flex" }}><strong style={{ color: "var(--text-muted)", width: "120px", flexShrink: 0 }}>Senha:</strong> <span>A senha configurada no painel de administração</span></li>
+                </ul>
+              </div>
+              <div style={{ display: "flex", gap: "12px", alignItems: "flex-start", background: "rgba(99, 102, 241, 0.1)", padding: "1.25rem", borderRadius: "8px", borderLeft: "4px solid var(--accent-primary)" }}>
+                <Info size={20} style={{ color: "var(--accent-primary)", flexShrink: 0, marginTop: "2px" }} />
+                <p style={{ margin: 0, fontSize: "0.875rem", color: "var(--text-secondary)", lineHeight: 1.6 }}>
+                  <strong>Atenção:</strong> Ao fazer o login, o usuário cairá automaticamente na pasta <code>/files</code>, que é a pasta isolada ("Jail") contendo apenas os arquivos dele. Ele não terá acesso aos arquivos de outros clientes nem aos arquivos vitais do servidor.
+                </p>
+              </div>
+            </div>
+
+            <div className="glass-panel" style={{ padding: "2rem", display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "10px", color: "var(--accent-warning)" }}>
+                <RefreshCw size={22} />
+                <h2 style={{ fontSize: "1.25rem", margin: 0, fontWeight: 600 }}>2. Como configurar a Sincronização RSYNC</h2>
+              </div>
+              <p style={{ color: "var(--text-secondary)", lineHeight: 1.6, margin: 0, fontSize: "0.9375rem" }}>
+                A sincronização é uma ferramenta poderosa para espelhar pastas entre servidores automaticamente. Você pode configurar o sistema para puxar (Pull) arquivos de um equipamento de telefonia (PABX) ou enviar (Push) arquivos para outro servidor.
+              </p>
+              
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem" }}>
+                <div style={{ background: "rgba(0,0,0,0.2)", padding: "1.25rem", borderRadius: "8px", border: "1px solid var(--glass-border)" }}>
+                  <h3 style={{ fontSize: "1rem", marginBottom: "0.75rem", color: "white" }}>Modo PULL (Puxar)</h3>
+                  <p style={{ fontSize: "0.875rem", color: "var(--text-secondary)", lineHeight: 1.5, margin: 0 }}>
+                    O SCP se conecta no servidor do cliente e <strong>copia os arquivos de lá para cá</strong>. Ideal para backup automático de gravações de centrais telefônicas antigas.
+                  </p>
+                </div>
+                <div style={{ background: "rgba(0,0,0,0.2)", padding: "1.25rem", borderRadius: "8px", border: "1px solid var(--glass-border)" }}>
+                  <h3 style={{ fontSize: "1rem", marginBottom: "0.75rem", color: "white" }}>Modo PUSH (Enviar)</h3>
+                  <p style={{ fontSize: "0.875rem", color: "var(--text-secondary)", lineHeight: 1.5, margin: 0 }}>
+                    O SCP envia os arquivos recém recebidos daqui <strong>para o servidor do cliente</strong>. Ideal para atualizar firmwares ou distribuir mídias remotamente.
+                  </p>
+                </div>
+              </div>
+              
+              <h3 style={{ fontSize: "1rem", marginTop: "0.5rem", color: "white" }}>Protocolos Disponíveis:</h3>
+              <ul style={{ listStyle: "none", padding: 0, margin: 0, color: "var(--text-secondary)", display: "flex", flexDirection: "column", gap: "12px", fontSize: "0.9375rem" }}>
+                <li style={{ display: "flex", gap: "10px" }}><span style={{ color: "var(--accent-primary)" }}>•</span><div><strong style={{ color: "var(--text-primary)" }}>Rsync Nativo:</strong> O mais rápido e eficiente. Transfere apenas a diferença entre os arquivos. Requer que o servidor remoto suporte RSYNC sobre SSH.</div></li>
+                <li style={{ display: "flex", gap: "10px" }}><span style={{ color: "var(--accent-primary)" }}>•</span><div><strong style={{ color: "var(--text-primary)" }}>SCP Clássico:</strong> Compatível com equipamentos antigos que não possuem o binário do RSYNC instalado, mas aceitam conexões SSH.</div></li>
+                <li style={{ display: "flex", gap: "10px" }}><span style={{ color: "var(--accent-primary)" }}>•</span><div><strong style={{ color: "var(--text-primary)" }}>FTP Legacy:</strong> Selecionando a porta 21 nas configurações, o sistema usará automaticamente o protocolo FTP antigo (usando lftp) para conectar em PABXs legados (ex: Yeastar Antigos).</div></li>
+              </ul>
+            </div>
+
+            <div className="glass-panel" style={{ padding: "2rem", display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "10px", color: "var(--accent-success)" }}>
+                <Clock size={22} />
+                <h2 style={{ fontSize: "1.25rem", margin: 0, fontWeight: 600 }}>3. Configurando Agendamentos (CRON)</h2>
+              </div>
+              <p style={{ color: "var(--text-secondary)", lineHeight: 1.6, margin: 0, fontSize: "0.9375rem" }}>
+                Para não precisar sincronizar manualmente toda vez, você pode configurar um agendamento automático usando a sintaxe CRON padrão do Linux (5 campos separados por espaço).
+              </p>
+              
+              <div style={{ background: "rgba(0,0,0,0.2)", padding: "1.5rem", borderRadius: "8px", border: "1px solid var(--glass-border)", overflowX: "auto" }}>
+                <pre style={{ margin: 0, color: "var(--text-muted)", fontFamily: "monospace", fontSize: "0.875rem", lineHeight: 1.4 }}>
+{`*    *    *    *    *
+┬    ┬    ┬    ┬    ┬
+│    │    │    │    └─ Dia da semana (0 - 7) (0 ou 7 são Domingo)
+│    │    │    └── Mês (1 - 12)
+│    │    └──── Dia do mês (1 - 31)
+│    └────── Hora (0 - 23)
+└──────── Minuto (0 - 59)`}
+                </pre>
+              </div>
+
+              <div>
+                <h3 style={{ fontSize: "1rem", marginBottom: "1rem", color: "white" }}>Exemplos Práticos:</h3>
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", background: "rgba(255,255,255,0.03)", borderRadius: "6px", border: "1px solid rgba(255,255,255,0.05)" }}>
+                    <code style={{ color: "var(--accent-primary)", fontSize: "1rem" }}>0 2 * * *</code>
+                    <span style={{ color: "var(--text-secondary)", fontSize: "0.9375rem" }}>Todo dia às 02:00 da manhã</span>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", background: "rgba(255,255,255,0.03)", borderRadius: "6px", border: "1px solid rgba(255,255,255,0.05)" }}>
+                    <code style={{ color: "var(--accent-primary)", fontSize: "1rem" }}>30 18 * * 1-5</code>
+                    <span style={{ color: "var(--text-secondary)", fontSize: "0.9375rem" }}>De Segunda a Sexta às 18:30</span>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", background: "rgba(255,255,255,0.03)", borderRadius: "6px", border: "1px solid rgba(255,255,255,0.05)" }}>
+                    <code style={{ color: "var(--accent-primary)", fontSize: "1rem" }}>0 * * * *</code>
+                    <span style={{ color: "var(--text-secondary)", fontSize: "0.9375rem" }}>De hora em hora (ex: 10:00, 11:00...)</span>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", background: "rgba(255,255,255,0.03)", borderRadius: "6px", border: "1px solid rgba(255,255,255,0.05)" }}>
+                    <code style={{ color: "var(--accent-primary)", fontSize: "1rem" }}>*/15 * * * *</code>
+                    <span style={{ color: "var(--text-secondary)", fontSize: "0.9375rem" }}>A cada 15 minutos indefinidamente</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div style={{ height: "2rem" }}></div>
+          </div>
+        ) : !selectedClient ? (
           /* Empty onboarding state */
           <div style={{
             flex: 1,
