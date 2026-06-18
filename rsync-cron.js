@@ -29,6 +29,48 @@ function logRsync(message) {
   try { fs.appendFileSync('/app/data/rsync.log', line + '\n'); } catch (e) {}
 }
 
+// ─── Sync disk files → SQLite (so web portal shows them) ────────────────────
+function syncDatabaseWithDisk(db, clientId, slug, localPath) {
+  try {
+    if (!fs.existsSync(localPath)) return;
+
+    const filesOnDisk = fs.readdirSync(localPath).filter(f => {
+      try { return fs.statSync(path.join(localPath, f)).isFile(); } catch (e) { return false; }
+    });
+
+    const dbFiles = db.prepare('SELECT id, path, size FROM File WHERE clientId = ?').all(clientId);
+    const dbFileMap = new Map(dbFiles.map(f => [path.basename(f.path), f]));
+
+    // Remove DB entries for files no longer on disk
+    for (const dbFile of dbFiles) {
+      const name = path.basename(dbFile.path);
+      if (!filesOnDisk.includes(name)) {
+        db.prepare('DELETE FROM File WHERE id = ?').run(dbFile.id);
+        logCron(`[DB Sync: ${slug}] Removed stale entry: ${name}`);
+      }
+    }
+
+    // Add new files from disk that aren't in DB
+    for (const diskFile of filesOnDisk) {
+      const stats = fs.statSync(path.join(localPath, diskFile));
+      const existing = dbFileMap.get(diskFile);
+      if (!existing) {
+        db.prepare(`INSERT INTO File (id, name, path, size, mimeType, clientId, createdAt, updatedAt)
+          VALUES (lower(hex(randomblob(16))), ?, ?, ?, 'application/octet-stream', ?, datetime('now'), datetime('now'))`)
+          .run(diskFile, `uploads/${slug}/files/${diskFile}`, stats.size, clientId);
+        logCron(`[DB Sync: ${slug}] Added new file: ${diskFile}`);
+      } else if (existing.size !== stats.size) {
+        db.prepare('UPDATE File SET size = ?, updatedAt = datetime(\'now\') WHERE id = ?').run(stats.size, existing.id);
+        logCron(`[DB Sync: ${slug}] Updated size for: ${diskFile}`);
+      }
+    }
+
+    logCron(`[DB Sync: ${slug}] ✅ Synced ${filesOnDisk.length} file(s) to DB`);
+  } catch (e) {
+    logCron(`[DB Sync: ${slug}] ❌ Error: ${e.message}`);
+  }
+}
+
 // ─── Execute RSYNC for a single client ───────────────────────────────────────
 function runRsyncForClient(client) {
   const { id, slug, rsyncHost, rsyncUser, rsyncPath, rsyncMode, rsyncSshKey, rsyncSshPassword, rsyncSshPort, rsyncProtocol } = client;
@@ -64,6 +106,15 @@ function runRsyncForClient(client) {
   }
 
   const modes = mode === 'both' ? ['push', 'pull'] : [mode];
+
+  // Open a writable DB connection for syncing
+  let writeDb;
+  try {
+    writeDb = new Database(dbPath);
+  } catch (e) {
+    logCron(`[Client: ${slug}] Could not open writable DB: ${e.message}`);
+    writeDb = null;
+  }
 
   for (const currentMode of modes) {
     let cmd = '';
@@ -102,12 +153,19 @@ function runRsyncForClient(client) {
       const output = execSync(cmd, { encoding: 'utf-8', timeout: 120000, stdio: ['ignore', 'pipe', 'pipe'] });
       logCron(`[Client: ${slug}] [${currentMode.toUpperCase()}] ✅ Success`);
       logRsync(`[Client: ${slug}] [${currentMode.toUpperCase()}] Output:\n${output}`);
+
+      // After a successful PULL, sync the DB so files appear on the web portal
+      if (currentMode === 'pull' && writeDb) {
+        syncDatabaseWithDisk(writeDb, id, slug, localPath);
+      }
     } catch (err) {
       const safeMsg = (err.stderr || err.message || '').replace(rsyncSshPassword || '', '***');
       logCron(`[Client: ${slug}] [${currentMode.toUpperCase()}] ❌ Error: ${safeMsg}`);
       logRsync(`[Client: ${slug}] [${currentMode.toUpperCase()}] Error: ${safeMsg}`);
     }
   }
+
+  if (writeDb) writeDb.close();
 
   // Cleanup key file
   if (fs.existsSync(keyPath)) {
