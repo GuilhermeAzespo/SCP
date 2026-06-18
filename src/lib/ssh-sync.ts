@@ -40,11 +40,19 @@ export function syncSshUser(
     }
 
     if (plainPassword) {
-      // Use execSync with echo to pass the password.
-      // This uses Alpine's default hashing (usually MD5 $1$ or SHA-256) which is perfectly compatible with OpenSSH.
+      // Use spawnSync to pass the password via stdin safely.
+      // This avoids shell interpolation issues if the password contains $ or '.
       try {
-        execSync(`echo "${slug}:${plainPassword}" | chpasswd`);
-        console.log(`[SSH Sync] Set password via chpasswd for: ${slug}`);
+        const { spawnSync } = require('child_process');
+        const chpasswdResult = spawnSync('chpasswd', [], { 
+          input: `${slug}:${plainPassword}\n`, 
+          encoding: 'utf-8' 
+        });
+        
+        if (chpasswdResult.status !== 0) {
+          throw new Error(`chpasswd failed with status ${chpasswdResult.status}: ${chpasswdResult.stderr}`);
+        }
+        console.log(`[SSH Sync] Set password via chpasswd safely for: ${slug}`);
       } catch (e: any) {
         console.error(`[SSH Sync] chpasswd failed for ${slug}:`, e?.message || e);
         throw e; // throw to be caught by the outer catch block
