@@ -53,19 +53,32 @@ async function reloadTasks() {
         logCron(`[RSYNC Cron] Starting new schedule for client ${client.id}: ${client.rsyncCron}`);
       }
 
-      const task = cron.schedule(client.rsyncCron, async () => {
+      const task = cron.schedule(client.rsyncCron, () => {
         logCron(`[RSYNC Cron] Triggering RSYNC via API for client ${client.id}...`);
-        try {
-          const res = await fetch(`http://localhost:3000/api/rsync?clientId=${client.id}&cronSecret=scp-internal-cron-secret-2026`, { method: 'POST' });
-          if (!res.ok) {
-            logCron(`[RSYNC Cron] HTTP error! status: ${res.status}`);
-          } else {
-            const data = await res.json();
-            logCron(`[RSYNC Cron] API triggered successfully. Success: ${data.success}`);
-          }
-        } catch (err) {
-          logCron(`[RSYNC Cron] Failed to trigger API: ${err.message}${err.cause ? ' - Cause: ' + err.cause.message : ''}`);
-        }
+        
+        const http = require('http');
+        const req = http.request({
+          hostname: '127.0.0.1',
+          port: 3000,
+          path: `/api/rsync?clientId=${client.id}&cronSecret=scp-internal-cron-secret-2026`,
+          method: 'POST'
+        }, (res) => {
+          let data = '';
+          res.on('data', chunk => data += chunk);
+          res.on('end', () => {
+            if (res.statusCode >= 200 && res.statusCode < 300) {
+              logCron(`[RSYNC Cron] API triggered successfully. Response: ${data}`);
+            } else {
+              logCron(`[RSYNC Cron] HTTP error! status: ${res.statusCode} - Data: ${data}`);
+            }
+          });
+        });
+
+        req.on('error', (err) => {
+          logCron(`[RSYNC Cron] Failed to trigger API: ${err.message}`);
+        });
+
+        req.end();
       });
 
       activeTasks[client.id] = { task, cronStr: client.rsyncCron };
