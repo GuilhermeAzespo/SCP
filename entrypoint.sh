@@ -29,8 +29,8 @@ chmod 755 /app /app/data /app/data/uploads 2>/dev/null || true
 echo "Starting OpenSSH daemon for SCP server..."
 # Generate host keys if they don't exist
 ssh-keygen -A
-# Start sshd in the background (foreground mode + stderr so we see its logs)
-/usr/sbin/sshd -D -e &
+# Start sshd in the background and log to a file we can read via API
+/usr/sbin/sshd -D -e > /app/data/sshd.log 2>&1 &
 
 echo "Starting RSYNC background cron service..."
 node rsync-cron.js &

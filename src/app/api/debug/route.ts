@@ -1,35 +1,24 @@
-import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
-import fs from "fs";
-import path from "path";
+import { NextResponse } from 'next/server';
+import fs from 'fs';
+import { execSync } from 'child_process';
 
 export async function GET() {
-  const files = await db.file.findMany();
-  const dataDir = process.env.DATA_DIR || "./data";
-  
-  const results = files.map(file => {
-    const physicalPath = path.resolve(process.cwd(), dataDir, file.path);
-    const exists = fs.existsSync(physicalPath);
+  try {
+    let log = '';
+    if (fs.existsSync('/app/data/sshd.log')) {
+      log = execSync('tail -n 100 /app/data/sshd.log', { encoding: 'utf-8' });
+    } else {
+      log = 'No sshd.log found';
+    }
     
-    // Also test what path.join would have done (the old bug)
-    const oldBugPath = path.join(process.cwd(), dataDir, file.path);
-    const existsOldBug = fs.existsSync(oldBugPath);
-    
-    return {
-      id: file.id,
-      name: file.name,
-      dbPath: file.path,
-      resolvedPhysicalPath: physicalPath,
-      existsOnDisk: exists,
-      oldBugPath: oldBugPath,
-      existsOnOldBugPath: existsOldBug,
-      createdAt: file.createdAt
-    };
-  });
+    // Also check chroot directory permissions to debug
+    let perms = '';
+    try {
+      perms = execSync('ls -ld / /app /app/data /app/data/uploads /app/data/uploads/* 2>/dev/null', { encoding: 'utf-8' });
+    } catch(e) {}
 
-  return NextResponse.json({
-    dataDirEnv: process.env.DATA_DIR,
-    cwd: process.cwd(),
-    results
-  });
+    return NextResponse.json({ log: log.split('\n'), perms: perms.split('\n') });
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
 }
