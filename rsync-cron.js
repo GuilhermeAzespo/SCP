@@ -56,7 +56,7 @@ async function reloadTasks() {
       const task = cron.schedule(client.rsyncCron, async () => {
         logCron(`[RSYNC Cron] Triggering RSYNC via API for client ${client.id}...`);
         try {
-          const res = await fetch(`http://127.0.0.1:3000/api/rsync?clientId=${client.id}&cronSecret=scp-internal-cron-secret-2026`, { method: 'POST' });
+          const res = await fetch(`http://localhost:3000/api/rsync?clientId=${client.id}&cronSecret=scp-internal-cron-secret-2026`, { method: 'POST' });
           if (!res.ok) {
             logCron(`[RSYNC Cron] HTTP error! status: ${res.status}`);
           } else {
@@ -64,7 +64,7 @@ async function reloadTasks() {
             logCron(`[RSYNC Cron] API triggered successfully. Success: ${data.success}`);
           }
         } catch (err) {
-          logCron(`[RSYNC Cron] Failed to trigger API: ${err.message}`);
+          logCron(`[RSYNC Cron] Failed to trigger API: ${err.message}${err.cause ? ' - Cause: ' + err.cause.message : ''}`);
         }
       });
 
