@@ -36,8 +36,8 @@ export function syncSshUser(
 
     if (!userExists) {
       // Use -H to prevent adduser from trying to create or chown the home directory.
-      // Without -H, adduser -h / will execute `chown slug:client /`, which breaks OpenSSH chroot.
-      execSync(`adduser -D -H -G client -h / -s /bin/sh ${slug}`);
+      // Set the home directory to /files so they land directly in their files directory.
+      execSync(`adduser -D -H -G client -h /files -s /bin/sh ${slug}`);
       console.log(`[SSH Sync] Created Linux user: ${slug}`);
     }
 

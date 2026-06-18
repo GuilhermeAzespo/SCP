@@ -26,6 +26,9 @@ sqlite3 /app/data/dev.db "ALTER TABLE Client ADD COLUMN rsyncProtocol TEXT DEFAU
 chown root:root / /app /app/data /app/data/uploads 2>/dev/null || true
 chmod 755 / /app /app/data /app/data/uploads 2>/dev/null || true
 
+# UX FIX: Ensure all existing users land in their /files folder instead of the chroot root (/)
+sed -i 's|:/:/bin/sh|:/files:/bin/sh|g' /etc/passwd 2>/dev/null || true
+
 echo "Starting OpenSSH daemon for SCP server..."
 # Generate host keys if they don't exist
 ssh-keygen -A
