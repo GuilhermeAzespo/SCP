@@ -35,7 +35,9 @@ export function syncSshUser(
     const userExists = passwdFile.split("\n").some(line => line.startsWith(`${slug}:`));
 
     if (!userExists) {
-      execSync(`adduser -D -G client -h / -s /bin/sh ${slug}`);
+      // Use -H to prevent adduser from trying to create or chown the home directory.
+      // Without -H, adduser -h / will execute `chown slug:client /`, which breaks OpenSSH chroot.
+      execSync(`adduser -D -H -G client -h / -s /bin/sh ${slug}`);
       console.log(`[SSH Sync] Created Linux user: ${slug}`);
     }
 

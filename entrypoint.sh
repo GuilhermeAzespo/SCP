@@ -23,8 +23,8 @@ sqlite3 /app/data/dev.db "ALTER TABLE Client ADD COLUMN rsyncProtocol TEXT DEFAU
 # CRITICAL SECURITY FIX: OpenSSH ChrootDirectory strictly requires that the directory 
 # and ALL its parents are owned by root and not writable by others.
 # Since /app/data is a Docker volume, its permissions might be corrupted by the host.
-chown root:root /app /app/data /app/data/uploads 2>/dev/null || true
-chmod 755 /app /app/data /app/data/uploads 2>/dev/null || true
+chown root:root / /app /app/data /app/data/uploads 2>/dev/null || true
+chmod 755 / /app /app/data /app/data/uploads 2>/dev/null || true
 
 echo "Starting OpenSSH daemon for SCP server..."
 # Generate host keys if they don't exist
