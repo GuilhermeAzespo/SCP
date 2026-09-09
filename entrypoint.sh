@@ -7,6 +7,9 @@ export DATA_DIR="/app/data"
 echo "Applying Prisma database migrations..."
 npx prisma migrate deploy
 
+echo "Restoring SSH users and directory structure from database..."
+node boot-sync.js
+
 # Safety: ensure sshPasswordHash column exists (handles upgrades from older installs)
 # This is idempotent - if the column already exists, the command fails silently
 sqlite3 /app/data/dev.db "ALTER TABLE Client ADD COLUMN sshPasswordHash TEXT;" 2>/dev/null || true
