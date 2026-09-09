@@ -29,5 +29,6 @@ Subsystem sftp internal-sftp
 
 Match Group client
     ChrootDirectory /app/data/uploads/%u
+    ForceCommand internal-sftp
     X11Forwarding no
     AllowTcpForwarding no

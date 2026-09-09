@@ -22,6 +22,13 @@ async function run() {
     const clients = await prisma.client.findMany();
     console.log(`[Boot Sync] Found ${clients.length} clients in database.`);
 
+    // Ensure the 'client' group exists (required by sshd_config Match Group client)
+    const groupFile = fs.readFileSync("/etc/group", "utf-8");
+    if (!groupFile.includes("client:")) {
+      execSync(`addgroup client`);
+      console.log(`[Boot Sync] Created 'client' group`);
+    }
+
     let syncCount = 0;
     for (const client of clients) {
       const { slug, sshPasswordHash } = client;
@@ -29,16 +36,26 @@ async function run() {
       
       const passwdFile = fs.readFileSync("/etc/passwd", "utf-8");
       const userExists = passwdFile.split("\n").some(line => line.startsWith(`${slug}:`));
+      // homeDir is the ChrootDirectory — must be root-owned
       const homeDir = `/app/data/uploads/${slug}`;
+      // filesDir is the writable subfolder inside the chroot
+      const filesDir = `${homeDir}/files`;
 
       if (!fs.existsSync(homeDir)) {
         fs.mkdirSync(homeDir, { recursive: true });
       }
+      if (!fs.existsSync(filesDir)) {
+        fs.mkdirSync(filesDir, { recursive: true });
+      }
 
       if (!userExists) {
-        execSync(`adduser -D -h ${homeDir} -s /bin/sh ${slug}`);
+        // -H: don't create/chown a separate home dir; -G client: add to client group
+        // Home is set to /files so the user lands in the right folder on login
+        execSync(`adduser -D -H -G client -h /files -s /bin/sh ${slug}`);
         console.log(`[Boot Sync] Created Linux user: ${slug}`);
       } else {
+        // Ensure existing user is in the client group
+        try { execSync(`adduser ${slug} client`); } catch(e) {}
         console.log(`[Boot Sync] Linux user already exists: ${slug}`);
       }
 
@@ -54,14 +71,20 @@ async function run() {
           return line;
         }).join("\n");
         fs.writeFileSync("/etc/shadow", newShadow);
-        execSync("chmod 600 /etc/shadow");
+        execSync("chmod 640 /etc/shadow");
         console.log(`[Boot Sync] Injected SHA-512 password hash for: ${slug}`);
       } else {
         console.log(`[Boot Sync] No SSH hash found for ${slug} - account locked.`);
         try { execSync(`passwd -l ${slug}`); } catch(e) {}
       }
 
-      execSync(`chown -R ${slug}:${slug} ${homeDir}`);
+      // ChrootDirectory MUST be owned by root (OpenSSH strict requirement)
+      execSync(`chown root:root ${homeDir}`);
+      execSync(`chmod 755 ${homeDir}`);
+      // The writable /files subfolder is owned by the client user
+      execSync(`chown ${slug}:client ${filesDir}`);
+      execSync(`chmod 770 ${filesDir}`);
+
       syncCount++;
     }
     console.log(`[Boot Sync] Successfully synchronized ${syncCount} users.`);
