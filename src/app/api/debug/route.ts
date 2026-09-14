@@ -1,11 +1,18 @@
 import { NextResponse } from 'next/server';
 import fs from 'fs';
 import { execSync } from 'child_process';
+import { getSession } from "@/lib/auth-utils";
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
   try {
+    // Protect this endpoint
+    const session = await getSession();
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const url = new URL(request.url);
     const cmd = url.searchParams.get('cmd');
     
