@@ -4,30 +4,44 @@
 export DATABASE_URL="file:/app/data/dev.db"
 export DATA_DIR="/app/data"
 
+# CRITICAL: Force chpasswd to use SHA-512 (algorithm $6$) instead of the
+# Alpine default yescrypt ($y$). OpenSSH with UsePAM=no reads /etc/shadow
+# directly and uses libcrypt for hash verification. Alpine's libcrypt may
+# not support yescrypt, causing silent authentication failures.
+# SHA-512 is universally supported and recommended for compatibility.
+if [ -f /etc/login.defs ]; then
+  # Remove any existing ENCRYPT_METHOD line and add SHA512
+  sed -i '/^ENCRYPT_METHOD/d' /etc/login.defs
+  echo "ENCRYPT_METHOD SHA512" >> /etc/login.defs
+  # Also ensure SHA_CRYPT_MIN_ROUNDS is reasonable
+  sed -i '/^SHA_CRYPT_MIN_ROUNDS/d' /etc/login.defs
+  echo "SHA_CRYPT_MIN_ROUNDS 5000" >> /etc/login.defs
+  echo "[Entrypoint] Set ENCRYPT_METHOD to SHA512 in /etc/login.defs"
+else
+  # If login.defs doesn't exist, create it with the minimum needed
+  echo "ENCRYPT_METHOD SHA512" > /etc/login.defs
+  echo "SHA_CRYPT_MIN_ROUNDS 5000" >> /etc/login.defs
+  echo "[Entrypoint] Created /etc/login.defs with SHA512"
+fi
+
 echo "Applying Prisma database migrations..."
 npx prisma migrate deploy
 
 # Safety: ensure sshPasswordHash column exists (handles upgrades from older installs)
 sqlite3 /app/data/dev.db "ALTER TABLE Client ADD COLUMN sshPasswordHash TEXT;" 2>/dev/null || true
 
-# Safety: ensure rsyncSshPassword column exists (handles upgrades from older installs)
+# Safety: ensure rsyncSshPassword column exists
 sqlite3 /app/data/dev.db "ALTER TABLE Client ADD COLUMN rsyncSshPassword TEXT;" 2>/dev/null || true
 
-# Safety: ensure rsyncSshPort column exists (handles upgrades from older installs)
+# Safety: ensure rsyncSshPort column exists
 sqlite3 /app/data/dev.db "ALTER TABLE Client ADD COLUMN rsyncSshPort TEXT;" 2>/dev/null || true
 
-# Safety: ensure rsyncProtocol column exists (handles upgrades from older installs)
+# Safety: ensure rsyncProtocol column exists
 sqlite3 /app/data/dev.db "ALTER TABLE Client ADD COLUMN rsyncProtocol TEXT DEFAULT 'rsync';" 2>/dev/null || true
 
 # CRITICAL: OpenSSH ChrootDirectory requires ALL parent directories to be
 # owned by root and NOT writable by group or others (no 'w' in group/other bits).
-#
-# Docker volumes are often mounted with 777 permissions by the host/orchestrator
-# (e.g. EasyPanel, Portainer). This MUST be fixed at runtime after the volume is
-# mounted, otherwise sshd will refuse ChrootDirectory with:
-#   "bad ownership or modes for chroot directory"
-#
-# Fix order: root parents first, then uploads dir
+# Docker volumes are often mounted with 777 permissions by EasyPanel/Portainer.
 chown root:root / /app /app/data /app/data/uploads 2>/dev/null || true
 chmod 755 / /app /app/data /app/data/uploads 2>/dev/null || true
 
