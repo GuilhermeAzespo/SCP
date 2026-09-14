@@ -235,6 +235,7 @@ export default function AdminDashboard() {
             setSelectedClient(null);
             setFiles([]);
             toast.success("Cliente excluído com sucesso!");
+            fetchClients();
           } else {
             toast.error("Erro ao excluir cliente.");
           }
@@ -1551,3 +1552,4 @@ export default function AdminDashboard() {
     </div>
   );
 }
+
