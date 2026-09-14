@@ -100,6 +100,18 @@ export function syncSshUser(
   return null;
 }
 
+/**
+ * Sets up the chroot environment for a client user.
+ * 
+ * IMPORTANT: Since sshd_config uses "ForceCommand internal-sftp", the sshd
+ * built-in SFTP server handles file transfers WITHOUT needing any binaries
+ * (sh, scp, rsync) or libraries inside the chroot directory.
+ * 
+ * The only requirements for ChrootDirectory are:
+ * 1. The directory (and all parents) must be owned by root and not writable by others.
+ * 2. A writable subdirectory for the user to place their files.
+ * 3. Optionally, a fake /etc/passwd inside the chroot so `ls -l` shows correct usernames.
+ */
 function setupChrootEnv(slug: string, homeDir: string) {
   try {
     // 1. Root must own the chroot directory for ChrootDirectory to work
@@ -112,47 +124,15 @@ function setupChrootEnv(slug: string, homeDir: string) {
     execSync(`chown ${slug}:client ${filesDir}`);
     execSync(`chmod 770 ${filesDir}`);
 
-    // 3. Build minimal chroot environment (binaries and libs)
-    const dirs = ['bin', 'usr/bin', 'lib', 'usr/lib', 'etc'];
-    for (const d of dirs) {
-      if (!fs.existsSync(`${homeDir}/${d}`)) {
-        fs.mkdirSync(`${homeDir}/${d}`, { recursive: true });
-      }
-    }
-
-    // Copy binaries
-    const binaries = ['/bin/sh', '/usr/bin/scp', '/usr/bin/rsync'];
-    for (const bin of binaries) {
-      if (fs.existsSync(bin)) {
-        fs.copyFileSync(bin, `${homeDir}${bin}`);
-        execSync(`chmod +x ${homeDir}${bin}`);
-        
-        // Find and copy dependencies using ldd (Alpine uses musl libc)
-        try {
-          const lddOut = execSync(`ldd ${bin} 2>/dev/null || true`, { encoding: 'utf-8' });
-          const lines = lddOut.split('\n');
-          for (const line of lines) {
-            const match = line.match(/=>\s+(.*?)\s+\(/) || line.match(/^\s+(.*?)\s+\(/) || line.match(/([/\w.-]+\.so[\d.]*)/);
-            if (match && match[1]) {
-              const lib = match[1].trim();
-              if (lib && fs.existsSync(lib) && !lib.startsWith('linux-vdso')) {
-                const libDest = `${homeDir}${lib}`;
-                if (!fs.existsSync(libDest)) {
-                  fs.mkdirSync(libDest.substring(0, libDest.lastIndexOf('/')), { recursive: true });
-                  fs.copyFileSync(lib, libDest);
-                }
-              }
-            }
-          }
-        } catch (e) {}
-      }
-    }
-
-    // 4. Create fake /etc/passwd inside chroot so `ls -l` shows correct username
-    const passwdContent = `root:x:0:0:root:/root:/bin/sh\n${slug}:x:1000:1000:,,,:/files:/bin/sh\n`;
+    // 3. Create a fake /etc/passwd inside the chroot so `ls -l` shows correct username
+    //    This is optional but improves UX. The etc directory must be root-owned.
+    const chrootEtcDir = `${homeDir}/etc`;
+    if (!fs.existsSync(chrootEtcDir)) fs.mkdirSync(chrootEtcDir, { recursive: true });
+    const passwdContent = `root:x:0:0:root:/root:/bin/sh\n${slug}:x:1000:1000:,,,:/ :/bin/sh\n`;
     fs.writeFileSync(`${homeDir}/etc/passwd`, passwdContent);
     execSync(`chmod 644 ${homeDir}/etc/passwd`);
 
+    console.log(`[SSH Sync] Chroot environment ready for: ${slug}`);
   } catch (err: any) {
     console.error(`[SSH Sync] Error setting up chroot env for ${slug}:`, err.message);
   }
