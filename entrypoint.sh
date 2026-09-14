@@ -7,9 +7,6 @@ export DATA_DIR="/app/data"
 echo "Applying Prisma database migrations..."
 npx prisma migrate deploy
 
-echo "Restoring SSH users and directory structure from database..."
-node boot-sync.js
-
 # Safety: ensure sshPasswordHash column exists (handles upgrades from older installs)
 # This is idempotent - if the column already exists, the command fails silently
 sqlite3 /app/data/dev.db "ALTER TABLE Client ADD COLUMN sshPasswordHash TEXT;" 2>/dev/null || true
@@ -26,11 +23,13 @@ sqlite3 /app/data/dev.db "ALTER TABLE Client ADD COLUMN rsyncProtocol TEXT DEFAU
 # CRITICAL SECURITY FIX: OpenSSH ChrootDirectory strictly requires that the directory 
 # and ALL its parents are owned by root and not writable by others.
 # Since /app/data is a Docker volume, its permissions might be corrupted by the host.
+# This MUST be done BEFORE boot-sync.js so that the base directories have correct ownership.
 chown root:root / /app /app/data /app/data/uploads 2>/dev/null || true
 chmod 755 / /app /app/data /app/data/uploads 2>/dev/null || true
 
-# UX FIX: Ensure all existing users land in their /files folder instead of the chroot root (/)
-sed -i 's|:/:/bin/sh|:/files:/bin/sh|g' /etc/passwd 2>/dev/null || true
+echo "Restoring SSH users and directory structure from database..."
+# boot-sync.js will then set per-user subdirectory ownership (slug:client on /files)
+node boot-sync.js
 
 echo "Starting OpenSSH daemon for SCP server..."
 # Generate host keys if they don't exist
