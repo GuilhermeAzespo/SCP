@@ -18,16 +18,17 @@ UsePAM no
 # Disable StrictModes to prevent Docker volume permission issues from blocking login
 StrictModes no
 
-# Increase logging to DEBUG3 to see exactly why it rejects the password
+# Logging level
 LogLevel DEBUG3
 
 # SFTP subsystem
 Subsystem sftp internal-sftp
 
-# Optional: You can enforce stricter restrictions globally, but since 
-# clients have /bin/sh but no write access outside their homes, it's fairly safe.
-
+# Restrict client group to SCP/SFTP via internal-sftp (no shell needed in chroot)
+# ForceCommand internal-sftp is critical: it uses the built-in sshd sftp server,
+# so no binaries or libs need to be copied inside the ChrootDirectory.
 Match Group client
     ChrootDirectory /app/data/uploads/%u
+    ForceCommand internal-sftp
     X11Forwarding no
     AllowTcpForwarding no
