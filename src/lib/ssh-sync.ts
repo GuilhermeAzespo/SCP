@@ -1,11 +1,20 @@
-import { execSync } from "child_process";
+import { execSync, spawnSync } from "child_process";
 import fs from "fs";
 
 /**
  * Creates or updates a Linux user for SSH/SCP access.
- * Uses chpasswd (Alpine-native) to set the password with SHA-512 hashing.
- * 
- * @returns The SHA-512 hash from /etc/shadow after setting the password, for persistence in DB.
+ *
+ * IMPORTANT - Password hashing strategy:
+ * Alpine Linux shadow 4.18+ uses yescrypt ($y$) as default algorithm in chpasswd.
+ * However, musl libc (used by Alpine) does NOT support yescrypt in libcrypt.
+ * OpenSSH with UsePAM=no uses libcrypt to verify passwords from /etc/shadow.
+ * Result: yescrypt hashes cause silent authentication failure even with correct password.
+ *
+ * FIX: We generate a SHA-512 ($6$) hash directly using `openssl passwd -6`
+ * and inject it into /etc/shadow, bypassing chpasswd entirely.
+ * SHA-512 is supported by musl libcrypt and all OpenSSH versions.
+ *
+ * @returns The SHA-512 hash stored in /etc/shadow, for persistence in DB.
  */
 export function syncSshUser(
   slug: string,
@@ -35,57 +44,65 @@ export function syncSshUser(
     const userExists = passwdFile.split("\n").some(line => line.startsWith(`${slug}:`));
 
     if (!userExists) {
-      // Use -H to prevent adduser from trying to create or chown the home directory.
-      // Set the home directory to /files so they land directly in their files directory.
       execSync(`adduser -D -H -G client -h /files -s /bin/sh ${slug}`);
       console.log(`[SSH Sync] Created Linux user: ${slug}`);
     }
 
     if (plainPassword) {
-      // Use spawnSync to pass the password via stdin safely.
-      // This avoids shell interpolation issues if the password contains $ or '.
+      // Generate SHA-512 hash using openssl passwd -6 (explicit SHA-512, musl-compatible)
+      // This bypasses chpasswd and its dependency on /etc/login.defs ENCRYPT_METHOD,
+      // which defaults to yescrypt ($y$) on Alpine shadow 4.18+ — unsupported by musl libcrypt.
+      let sha512Hash: string | null = null;
       try {
-        const { spawnSync } = require('child_process');
-        const chpasswdResult = spawnSync('chpasswd', [], { 
-          input: `${slug}:${plainPassword}\n`, 
-          encoding: 'utf-8' 
+        const result = spawnSync('openssl', ['passwd', '-6', '-stdin'], {
+          input: plainPassword,
+          encoding: 'utf-8'
         });
-        
-        if (chpasswdResult.status !== 0) {
-          throw new Error(`chpasswd failed with status ${chpasswdResult.status}: ${chpasswdResult.stderr}`);
+        if (result.status === 0 && result.stdout) {
+          sha512Hash = result.stdout.trim();
+          console.log(`[SSH Sync] Generated SHA-512 hash via openssl for: ${slug}`);
+        } else {
+          throw new Error(`openssl passwd -6 failed: ${result.stderr}`);
         }
-        console.log(`[SSH Sync] Set password via chpasswd safely for: ${slug}`);
       } catch (e: any) {
-        console.error(`[SSH Sync] chpasswd failed for ${slug}:`, e?.message || e);
-        throw e; // throw to be caught by the outer catch block
+        console.error(`[SSH Sync] openssl passwd failed for ${slug}:`, e?.message || e);
+        // Fallback: try chpasswd
+        try {
+          const chpasswdResult = spawnSync('chpasswd', [], {
+            input: `${slug}:${plainPassword}\n`,
+            encoding: 'utf-8'
+          });
+          if (chpasswdResult.status !== 0) {
+            throw new Error(`chpasswd also failed: ${chpasswdResult.stderr}`);
+          }
+          console.log(`[SSH Sync] Set password via chpasswd fallback for: ${slug}`);
+        } catch (e2: any) {
+          console.error(`[SSH Sync] Both openssl and chpasswd failed for ${slug}:`, e2?.message || e2);
+          throw e2;
+        }
       }
 
-      // Read back the generated hash from /etc/shadow for persistence
-      const shadowFile = fs.readFileSync("/etc/shadow", "utf-8");
-      const shadowLine = shadowFile.split("\n").find(line => line.startsWith(`${slug}:`));
-      if (shadowLine) {
-        const generatedHash = shadowLine.split(":")[1];
-        console.log(`[SSH Sync] Captured hash for DB persistence: ${slug}`);
-        
+      if (sha512Hash) {
+        // Inject the SHA-512 hash directly into /etc/shadow
+        injectHashIntoShadow(slug, sha512Hash);
         setupChrootEnv(slug, homeDir);
-        return generatedHash; // Return for storage in DB
+        return sha512Hash;
+      } else {
+        // Fallback: read back whatever chpasswd wrote
+        const shadowFile = fs.readFileSync("/etc/shadow", "utf-8");
+        const shadowLine = shadowFile.split("\n").find(line => line.startsWith(`${slug}:`));
+        if (shadowLine) {
+          const generatedHash = shadowLine.split(":")[1];
+          console.log(`[SSH Sync] Captured hash from shadow for: ${slug}`);
+          setupChrootEnv(slug, homeDir);
+          return generatedHash;
+        }
       }
 
     } else if (sshPasswordHash) {
       // Boot restore: inject stored SHA-512 hash directly into /etc/shadow
-      const shadowFile = fs.readFileSync("/etc/shadow", "utf-8");
-      const newShadow = shadowFile.split("\n").map(line => {
-        if (line.startsWith(`${slug}:`)) {
-          const parts = line.split(":");
-          parts[1] = sshPasswordHash;
-          return parts.join(":");
-        }
-        return line;
-      }).join("\n");
-      fs.writeFileSync("/etc/shadow", newShadow);
-      execSync("chmod 640 /etc/shadow");
+      injectHashIntoShadow(slug, sshPasswordHash);
       console.log(`[SSH Sync] Restored SHA-512 hash from DB for: ${slug}`);
-      
       setupChrootEnv(slug, homeDir);
     } else {
       // No password: lock the account
@@ -101,16 +118,33 @@ export function syncSshUser(
 }
 
 /**
+ * Injects a password hash directly into /etc/shadow for the given user.
+ * More reliable than chpasswd because it bypasses /etc/login.defs algorithm settings.
+ */
+function injectHashIntoShadow(slug: string, hash: string) {
+  const shadowFile = fs.readFileSync("/etc/shadow", "utf-8");
+  const newShadow = shadowFile.split("\n").map(line => {
+    if (line.startsWith(`${slug}:`)) {
+      const parts = line.split(":");
+      parts[1] = hash;
+      return parts.join(":");
+    }
+    return line;
+  }).join("\n");
+  fs.writeFileSync("/etc/shadow", newShadow);
+  execSync("chmod 640 /etc/shadow");
+  console.log(`[SSH Sync] Injected SHA-512 hash into /etc/shadow for: ${slug}`);
+}
+
+/**
  * Sets up the chroot environment for a client user.
- * 
- * IMPORTANT: Since sshd_config uses "ForceCommand internal-sftp", the sshd
- * built-in SFTP server handles file transfers WITHOUT needing any binaries
- * (sh, scp, rsync) or libraries inside the chroot directory.
- * 
- * The only requirements for ChrootDirectory are:
- * 1. The directory (and all parents) must be owned by root and not writable by others.
- * 2. A writable subdirectory for the user to place their files.
- * 3. Optionally, a fake /etc/passwd inside the chroot so `ls -l` shows correct usernames.
+ *
+ * Since sshd_config uses "ForceCommand internal-sftp", the sshd built-in
+ * SFTP server handles all transfers — no binaries or libs needed in chroot.
+ *
+ * OpenSSH ChrootDirectory requirements:
+ * 1. The directory and ALL parents must be owned by root, not writable by others.
+ * 2. A writable subdirectory for the user's files.
  */
 function setupChrootEnv(slug: string, homeDir: string) {
   try {
@@ -125,7 +159,6 @@ function setupChrootEnv(slug: string, homeDir: string) {
     execSync(`chmod 770 ${filesDir}`);
 
     // 3. Create a fake /etc/passwd inside the chroot so `ls -l` shows correct username
-    //    This is optional but improves UX. The etc directory must be root-owned.
     const chrootEtcDir = `${homeDir}/etc`;
     if (!fs.existsSync(chrootEtcDir)) fs.mkdirSync(chrootEtcDir, { recursive: true });
     const passwdContent = `root:x:0:0:root:/root:/bin/sh\n${slug}:x:1000:1000:,,,:/ :/bin/sh\n`;
@@ -159,13 +192,12 @@ export function deleteSshUser(slug: string) {
 
 /**
  * Boot restore: re-syncs all persisted clients from DB back to Linux users.
- * Uses stored SHA-512 hashes since plaintext is not available at boot.
  */
 export async function syncAllSshUsers(clients: { slug: string, passwordHash: string | null }[]) {
   console.log("[SSH Sync] Starting full synchronization of database clients to Linux users...");
   let syncCount = 0;
   for (const client of clients) {
-    syncSshUser(client.slug, null, client.passwordHash); // passwordHash here is already sshPasswordHash
+    syncSshUser(client.slug, null, client.passwordHash);
     syncCount++;
   }
   console.log(`[SSH Sync] Successfully synchronized ${syncCount} users.`);
