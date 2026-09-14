@@ -25,10 +25,10 @@ export async function GET(request: Request) {
       return ['Arquivo não encontrado.'];
     };
 
-    let perms = [];
+    let perms: string[] = [];
     try { perms = execSync('ls -ld / /app /app/data /app/data/uploads /app/data/uploads/* 2>/dev/null', { encoding: 'utf-8' }).split('\n'); } catch(e) {}
 
-    let shadowEntries = [];
+    let shadowEntries: string[] = [];
     try {
       const shadowFile = fs.readFileSync('/etc/shadow', 'utf-8');
       shadowEntries = shadowFile.split('\n')
